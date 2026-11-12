@@ -29,7 +29,7 @@ test('#flush sends a pending message to the session by name, once', async () => 
   ctx.fileProposal('tidy-docs');
   const first = await flush(ctx.db);
   expect(first).toMatchObject({ sent: 1, failed: 0 });
-  expect(atc.sent).toStrictEqual([{ session: 'id-stu', text: expect.stringContaining('proposal ready: tidy-docs'), from: 'hq', idempotencyKey: expect.stringMatching(/^hq-ev\d+-z-stu$/u), notice: false }]);
+  expect(atc.sent).toStrictEqual([{ session: 'id-stu', text: expect.stringContaining('proposal ready: tidy-docs'), from: 'hq', idempotencyKey: expect.stringMatching(/^hq-ev\d+-stu$/u), notice: false }]);
   const again = await flush(ctx.db, { retryFailed: true });
   expect(again).toMatchObject({ sent: 0 });
   expect(atc.sent).toHaveLength(1);
@@ -68,10 +68,10 @@ test('it leaves a row sent when another flush sent it while this one failed to r
 test('#flush reaches a fleet session renamed under hq by the id hq fleet recorded', async () => {
   const ctx = setupTest();
   const atc = ctx.startAtc([
-    { id: 'id-stu', name: 'stu', alive: true, state: 'done' },
-    { id: 'id-other', name: 'z-stu', alive: true, state: 'done' },
+    { id: 'id-stu', name: 'stu-renamed', alive: true, state: 'done' },
+    { id: 'id-other', name: 'stu', alive: true, state: 'done' },
   ]);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'id-stu' }));
   ctx.fileProposal('tidy-docs');
   const result = await flush(ctx.db);
   expect(result).toMatchObject({ sent: 1, failed: 0 });
@@ -81,10 +81,10 @@ test('#flush reaches a fleet session renamed under hq by the id hq fleet recorde
 test("#flush falls back to the name when the recorded id's session is gone", async () => {
   const ctx = setupTest();
   const atc = ctx.startAtc([
-    { id: 'id-old', name: 'stu', alive: false, state: 'exited' },
-    { id: 'id-new', name: 'z-stu', alive: true, state: 'done' },
+    { id: 'id-old', name: 'stu-renamed', alive: false, state: 'exited' },
+    { id: 'id-new', name: 'stu', alive: true, state: 'done' },
   ]);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'id-old' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'id-old' }));
   ctx.fileProposal('tidy-docs');
   const result = await flush(ctx.db);
   expect(result).toMatchObject({ sent: 1 });
@@ -94,13 +94,13 @@ test("#flush falls back to the name when the recorded id's session is gone", asy
 test('#flush fails only that message for an unknown or ambiguous session name', async () => {
   const ctx = setupTest();
   ctx.startAtc([
-    { id: 'a', name: 'z-stu', alive: true, state: 'done' },
-    { id: 'b', name: 'z-stu', alive: true, state: 'done' },
+    { id: 'a', name: 'stu', alive: true, state: 'done' },
+    { id: 'b', name: 'stu', alive: true, state: 'done' },
   ]);
   ctx.fileProposal('tidy-docs');
   const result = await flush(ctx.db);
   expect(result.failed).toBe(1);
-  expect(result.errors[0]).toContain('2 live sessions are named z-stu');
+  expect(result.errors[0]).toContain('2 live sessions are named stu');
 });
 
 test('#flush leaves messages pending when HQ_NOTIFY is off', async () => {
@@ -246,11 +246,11 @@ test('#setForward refuses a long forward chain that closes a loop', () => {
 test('#flush sends no row to its old target when the row is dropped or forwarded after the flush selected it', async () => {
   const ctx = setupTest();
   const atc = ctx.startAtc([
-    { id: 'id-stu', name: 'z-stu', alive: true, state: 'done' },
+    { id: 'id-stu', name: 'stu', alive: true, state: 'done' },
     { id: 'id-teapot', name: 'z-teapot', alive: true, state: 'done' },
   ]);
   const seq = logEvent(ctx.db, 'hq', 'probe', 'probe', 'z-q', null, null);
-  enqueue(ctx.db, seq, 'z-stu', 'one');
+  enqueue(ctx.db, seq, 'stu', 'one');
   enqueue(ctx.db, seq, 'z-kettle', 'two');
   const original = atc.onMessage;
   atc.onMessage = () => setForward(ctx.db, 'z-kettle', 'z-teapot');
@@ -269,7 +269,7 @@ test('it sends the row a command queues, and leaves the other pending rows unsen
   expect(atc.sent).toStrictEqual([expect.objectContaining({ session: 'id-stu', text: expect.stringContaining('proposal ready: tidy-docs') })]);
   expect(ctx.readStatuses()).toStrictEqual([
     { target: 'z-delivery', status: 'pending' },
-    { target: 'z-stu', status: 'sent' },
+    { target: 'stu', status: 'sent' },
   ]);
 });
 

@@ -687,20 +687,20 @@ test('hq lanes shows the cause of the empty slots and the minutes by cause for t
 test('hq lanes cap shows the stored cap with the working count', async () => {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'stu', at: '2026-10-14T00:00:00Z' }));
   const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY } });
 
   const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
   expect(code).toBe(0);
-  expect(JSON.parse(stdout)).toStrictEqual({ ok: true, cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }, working: 0, workingFrom: 'runs', error: null });
+  expect(JSON.parse(stdout)).toStrictEqual({ ok: true, cap: { cap: 7, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'stu', at: '2026-10-14T00:00:00Z' }, working: 0, workingFrom: 'runs', error: null });
 });
 
 test('hq lanes cap refuses a change while atc cannot say who is asking, and stores nothing', async () => {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
-  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', '7', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-stu' } });
+  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'z-delivery': 'kettle-2' }));
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', 'cap', '7', '--json'], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'stu' } });
 
   const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
@@ -731,7 +731,7 @@ test('hq lanes --json carries the stored cap with the working count and what lim
   writeFileSync(`${fresh.dir}/skill/pacing.json`, JSON.stringify({ slots: { imp: 0, local: 2 } }));
   setMeta(fresh.db, 'lanes_ready_issues', JSON.stringify({ at: '2026-10-14T00:55:00Z', eligible: [], design: [] }));
   setMeta(fresh.db, 'lanes_promotable_focus', JSON.stringify({ at: '2026-10-14T00:50:00Z', count: 3, focus: '[]' }));
-  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'stu', at: '2026-10-14T00:00:00Z' }));
   const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', '--json'], {
     stdout: 'pipe',
     stderr: 'pipe',
@@ -740,7 +740,7 @@ test('hq lanes --json carries the stored cap with the working count and what lim
 
   const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
-  expect(findPath(JSON.parse(stdout), 'cap')).toStrictEqual({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', working: 0, limitedBy: 'cap', workingFrom: 'runs' });
+  expect(findPath(JSON.parse(stdout), 'cap')).toStrictEqual({ cap: 1, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'stu', working: 0, limitedBy: 'cap', workingFrom: 'runs' });
 });
 
 test('hq lanes --json carries the stored cap the watcher enforces when pacing has no lanes', async () => {
@@ -752,7 +752,7 @@ test('hq lanes --json carries the stored cap the watcher enforces when pacing ha
   mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
   writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
   writeFileSync(`${fresh.dir}/skill/pacing.json`, '{}');
-  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'stu', at: '2026-10-14T00:00:00Z' }));
   const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes', '--json'], {
     stdout: 'pipe',
     stderr: 'pipe',
@@ -761,7 +761,7 @@ test('hq lanes --json carries the stored cap the watcher enforces when pacing ha
 
   const [, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
-  expect(JSON.parse(stdout)).toMatchObject({ plan: null, cap: { cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', working: 0, limitedBy: 'pool', workingFrom: 'runs' } });
+  expect(JSON.parse(stdout)).toMatchObject({ plan: null, cap: { cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'stu', working: 0, limitedBy: 'pool', workingFrom: 'runs' } });
 });
 
 test('hq lanes prints the stored cap under the missing slot plan when pacing has no lanes', async () => {
@@ -773,7 +773,7 @@ test('hq lanes prints the stored cap under the missing slot plan when pacing has
   mkdirSync(`${fresh.dir}/skill/scripts`, { recursive: true });
   writeFileSync(`${fresh.dir}/skill/scripts/capacity.sh`, `echo '${JSON.stringify({ imp: { freeMib: 0, room: false } })}'\n`);
   writeFileSync(`${fresh.dir}/skill/pacing.json`, '{}');
-  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(fresh.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-18T21:00:00Z', reason: 'kettle descaling', by: 'stu', at: '2026-10-14T00:00:00Z' }));
   const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'lanes'], {
     stdout: 'pipe',
     stderr: 'pipe',
@@ -833,19 +833,19 @@ test('hq grant void refuses a caller atc cannot name, whatever --by and HQ_AS cl
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
   at(NOON_SYDNEY);
-  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2' }));
+  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2' }));
   createGrantMark(fresh.db, { text: 'kettle PRs merge on green CI', ref: null, at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(fresh.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
-  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'grant', 'void', '1', '--reason', 'wrong PR', '--by', 'z-stu', '--json'], {
+  const child = Bun.spawn(['bun', join(import.meta.dir, 'cli.ts'), 'grant', 'void', '1', '--reason', 'wrong PR', '--by', 'stu', '--json'], {
     stdout: 'pipe',
     stderr: 'pipe',
-    env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'z-stu', ATC_SESSION_ID: 'kettle-1' },
+    env: { ...process.env, HOME: fresh.dir, HQ_DB: fresh.path, HQ_NOTIFY: 'off', HQ_NOW: NOON_SYDNEY, HQ_AS: 'stu', ATC_SESSION_ID: 'kettle-1' },
   });
 
   const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()]);
 
   expect(code).toBe(1);
-  expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'not_allowed', message: expect.stringContaining('only teapot-bot, who logged grant action 1, or z-stu may void it; atc cannot say who is calling') } });
+  expect(JSON.parse(stdout)).toMatchObject({ ok: false, error: { code: 'not_allowed', message: expect.stringContaining('only teapot-bot, who logged grant action 1, or stu may void it; atc cannot say who is calling') } });
   expect(fresh.db.query('SELECT voided_at FROM grant_actions').all()).toStrictEqual([{ voided_at: null }]);
 });
 
@@ -869,8 +869,8 @@ test('hq grant actions shows a voided act struck out with its reason in text and
   const text = await hq();
   const json = await hq('--json');
 
-  expect(text.trim()).toBe('kettle-merges (mark 1): 1: kettle#9 (teapot-bot); ~~kettle#8 (teapot-bot)~~ void act 1, 2026-10-14T01:30:00Z by z-stu: logged before the merge failed');
-  expect(findPath(JSON.parse(json), 'grants', 0, 'voided')).toStrictEqual([{ id: 1, target: 'kettle#8', note: null, actor: 'teapot-bot', at: NOON_SYDNEY, voidedAt: '2026-10-14T01:30:00Z', voidedBy: 'z-stu', voidReason: 'logged before the merge failed' }]);
+  expect(text.trim()).toBe('kettle-merges (mark 1): 1: kettle#9 (teapot-bot); ~~kettle#8 (teapot-bot)~~ void act 1, 2026-10-14T01:30:00Z by stu: logged before the merge failed');
+  expect(findPath(JSON.parse(json), 'grants', 0, 'voided')).toStrictEqual([{ id: 1, target: 'kettle#8', note: null, actor: 'teapot-bot', at: NOON_SYDNEY, voidedAt: '2026-10-14T01:30:00Z', voidedBy: 'stu', voidReason: 'logged before the merge failed' }]);
 });
 
 test('hq capacity says the slot reads are not set up, in text and in --json', async () => {

@@ -1,11 +1,11 @@
 # PR walk brief
 
-Filled by `z-stu` as intake's `references/pr-walk.md` says.
+Filled by `stu` as intake's `references/pr-walk.md` says.
 
 ```text
 # Brief: going through PRs with the owner, <the subject, such as "PRs with over 2 review rounds">
 
-You are a short-lived helper. z-stu, the session the owner talks to, started you so he can go through PRs with you away from that chat. noslop is the review bot; a round is one noslop review of a new head. Find out with him why each PR took rework, and report to z-stu.
+You are a short-lived helper. stu, the session the owner talks to, started you so he can go through PRs with you away from that chat. noslop is the review bot; a round is one noslop review of a new head. Find out with him why each PR took rework, and report to stu.
 
 ## Purpose
 
@@ -47,7 +47,7 @@ Test each PR against these, and say when one shows something new.
 
 ## Rules
 
-- Change and post nothing anywhere. You write only your log in your scratchpad and one message to z-stu.
+- Change and post nothing anywhere. You write only your log in your scratchpad and one message to stu.
 - <The record line from pr-walk.private.md.>
 
 ## When you finish
@@ -55,6 +55,6 @@ Test each PR against these, and say when one shows something new.
 When he has seen every PR, or says stop:
 
 1. Write the full log to your scratchpad.
-2. Send z-stu one `atc_message_send` message, to session <z-stu's session id>: each fault confirmed with its PR count, each new fault, each change he agreed (<the form for an agreed change>), each item to file, and the log's path.
-3. Tell him you're done, and that z-stu files what he wants filed.
+2. Send stu one `atc_message_send` message, to session <stu's session id>: each fault confirmed with its PR count, each new fault, each change he agreed (<the form for an agreed change>), each item to file, and the log's path.
+3. Tell him you're done, and that stu files what he wants filed.
 ```

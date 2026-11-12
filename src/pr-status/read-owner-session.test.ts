@@ -20,22 +20,22 @@ function setupTest() {
 
 test("it accepts the caller atc finds in the owner's recorded session", async () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'sess-owner' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'sess-owner' }));
 
   await expect(readOwnerSession(ctx.db, { openClient: () => Promise.resolve(ctx.client('sess-owner')) })).resolves.toStrictEqual({ verdict: 'owner' });
 });
 
 test("it refuses another session, even one HQ_AS names as the owner", async () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'sess-owner' }));
-  onTestFinished(overrideEnv('HQ_AS', 'z-stu'));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'sess-owner' }));
+  onTestFinished(overrideEnv('HQ_AS', 'stu'));
 
   await expect(readOwnerSession(ctx.db, { openClient: () => Promise.resolve(ctx.client('sess-kettle')) })).resolves.toStrictEqual({ verdict: 'other' });
 });
 
 test('it keeps the cause when atc is unreachable, rather than calling the caller another session', async () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'sess-owner' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'sess-owner' }));
 
   await expect(readOwnerSession(ctx.db, { openClient: () => Promise.reject(new Error('no socket')) })).resolves.toStrictEqual({ verdict: 'unknown', cause: 'no socket' });
 });

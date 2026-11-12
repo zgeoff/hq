@@ -18,7 +18,7 @@ function setupTest() {
 test.each(['lanes-low-water', 'lanes-stalled-triage'])('it keeps a %s message queued before a lanes hold pending through the hold and sends it after', async (topic) => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
-  enqueue(ctx.db, logEvent(ctx.db, 'hq', 'kettle-alert', 'alerted', 'hq-lanes', null, null, {}), 'z-stu', 'Lanes: the kettle ran dry.', topic);
+  enqueue(ctx.db, logEvent(ctx.db, 'hq', 'kettle-alert', 'alerted', 'hq-lanes', null, null, {}), 'stu', 'Lanes: the kettle ran dry.', topic);
   holdLanes(ctx.db, 10, 'host switch', 'kettle-owner');
 
   await expect(flush(ctx.db)).resolves.toMatchObject({ sent: 0, failed: 0 });

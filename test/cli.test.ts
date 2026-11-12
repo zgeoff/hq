@@ -30,7 +30,7 @@ function setupTest() {
   const fresh = createTestDb();
   at(NOON_SYDNEY);
   updateEnv('HQ_NOTIFY', 'off');
-  updateEnv('HQ_AS', 'z-stu');
+  updateEnv('HQ_AS', 'stu');
   const out: string[] = [];
   const logSpy = spyOn(console, 'log').mockImplementation((line: string) => {
     out.push(line);
@@ -219,7 +219,7 @@ test('it marks an item with no condition as recheck in hq unblock list after 3 d
       unblocks: [],
       rank: null,
       notify: [],
-      added_by: 'z-stu',
+      added_by: 'stu',
       state: 'open',
       added_seq: 1,
       added_at: '2026-10-14T01:00:00Z',
@@ -254,7 +254,7 @@ test('it does not mark an item with no condition as recheck in hq unblock list a
       unblocks: [],
       rank: null,
       notify: [],
-      added_by: 'z-stu',
+      added_by: 'stu',
       state: 'open',
       added_seq: 1,
       added_at: '2026-10-14T01:00:00Z',
@@ -289,7 +289,7 @@ test('it never marks an item with a condition as recheck in hq unblock list', as
       unblocks: [],
       rank: null,
       notify: [],
-      added_by: 'z-stu',
+      added_by: 'stu',
       state: 'open',
       added_seq: 1,
       added_at: '2026-10-14T01:00:00Z',
@@ -510,8 +510,8 @@ test('hq run reopen brings a dropped run back to working, as the refusal says', 
 test('it attaches with hq run pr --session the PR and sets its owner, and works again on the attached PR', async () => {
   const ctx = setupTest();
   await ctx.hq('run', 'add', 'GEO-531', '--title', 'Invented kettle work', '--where', 'none');
-  setSession(ctx.db, 'GEO-531', '0000e101-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-stu', 'add');
-  setSession(ctx.db, 'GEO-531', '0000e102-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'z-stu', 'add');
+  setSession(ctx.db, 'GEO-531', '0000e101-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'stu', 'add');
+  setSession(ctx.db, 'GEO-531', '0000e102-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'stu', 'add');
 
   const first = await ctx.hq('run', 'pr', 'GEO-531', 'kettle#31', '--session', '0000E101');
   const again = await ctx.hq('run', 'pr', 'GEO-531', 'kettle#31', '--session', '0000e102');
@@ -842,14 +842,14 @@ test("hq capacity broker reads the broker slot's fresh slot read from the databa
   expect(findPath(quota.json, 'broker')).toMatchObject({ state: 'read', slot: 1, used: 0, readAt: '2026-10-14T00:30:00Z' });
 });
 
-test('hq whois names the fleet session hq fleet saw under an id, and null for any other id', async () => {
+test('it answers hq whois with the fleet session hq fleet saw under an id and its roles, and null for any other id', async () => {
   const ctx = setupTest();
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ stu: 'id-stu' }));
   const stu = await ctx.hq('whois', 'id-stu');
   const teapot = await ctx.hq('whois', 'id-teapot');
   expect([stu.json, teapot.json]).toStrictEqual([
-    { ok: true, session: 'id-stu', name: 'z-stu' },
-    { ok: true, session: 'id-teapot', name: null },
+    { ok: true, session: 'id-stu', name: 'stu', roles: ['owner'] },
+    { ok: true, session: 'id-teapot', name: null, roles: [] },
   ]);
 });
 
@@ -1051,18 +1051,18 @@ test('hq pr override and accept-risk refuse a chat source named by --by and HQ_A
   const ctx = setupTest();
   updateEnv('ATC_SESSION_ID', undefined);
 
-  const override = await ctx.hq('pr', 'override', 'widgets', '7', '--source', 'chat:kettle-1', '--by', 'z-stu', '--note', 'Teapot is fine.');
-  const acceptRisk = await ctx.hq('pr', 'accept-risk', 'widgets', '7', 'f1f1f1f1f1f1f1f1', '--source', 'chat:kettle-1', '--by', 'z-stu', '--note', 'Teapot is fine.');
+  const override = await ctx.hq('pr', 'override', 'widgets', '7', '--source', 'chat:kettle-1', '--by', 'stu', '--note', 'Teapot is fine.');
+  const acceptRisk = await ctx.hq('pr', 'accept-risk', 'widgets', '7', 'f1f1f1f1f1f1f1f1', '--source', 'chat:kettle-1', '--by', 'stu', '--note', 'Teapot is fine.');
 
-  expect([override.code === 0, findPath(override.json, 'error', 'code'), z.string().parse(findPath(override.json, 'error', 'message')).endsWith('; ask z-stu to record it')]).toStrictEqual([false, 'bad_args', true]);
-  expect([acceptRisk.code === 0, findPath(acceptRisk.json, 'error', 'code'), z.string().parse(findPath(acceptRisk.json, 'error', 'message')).endsWith('; ask z-stu to record it')]).toStrictEqual([false, 'bad_args', true]);
+  expect([override.code === 0, findPath(override.json, 'error', 'code'), z.string().parse(findPath(override.json, 'error', 'message')).endsWith('; ask stu to record it')]).toStrictEqual([false, 'bad_args', true]);
+  expect([acceptRisk.code === 0, findPath(acceptRisk.json, 'error', 'code'), z.string().parse(findPath(acceptRisk.json, 'error', 'message')).endsWith('; ask stu to record it')]).toStrictEqual([false, 'bad_args', true]);
 });
 
 test('hq call answer refuses and saves nothing when atc cannot say whether the caller is the owner session', async () => {
   const ctx = setupTest();
   onTestFinished(overrideEnv('ATC_SESSION_ID', 'id-stu'));
   onTestFinished(overrideEnv('HQ_ATC_SOCKET', `${ctx.directory}/no-kettle-here.sock`));
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'id-stu' }));
   await ctx.hq('call', 'add', 'KET-31', '--title', 'Pour widgets#7 now?', '--question', 'Boil?', '--body', 'Invented.');
   await ctx.hq('open');
 
@@ -1072,7 +1072,7 @@ test('hq call answer refuses and saves nothing when atc cannot say whether the c
   expect([answered.code === 0, findPath(answered.json, 'error', 'code'), findPath(answered.json, 'error', 'message')]).toStrictEqual([
     false,
     'atc_unreachable',
-    "atc could not say whether this caller is the owner's session (z-stu), so the answer is not saved: Failed to connect. Run it again once atc answers, or answer in the console",
+    "atc could not say whether this caller is the owner's session (stu), so the answer is not saved: Failed to connect. Run it again once atc answers, or answer in the console",
   ]);
   const history = z.array(z.looseObject({ action: z.string() })).parse(findPath(shown.json, 'history'));
   expect([findPath(shown.json, 'call', 'state'), history.map((event) => event.action)]).toStrictEqual(['open', ['added', 'opened']]);
@@ -1084,7 +1084,7 @@ test("hq call answer ignores a daemon at HQ_ATC_SOCKET that names the owner's se
   onTestFinished(daemon.stop);
   onTestFinished(overrideEnv('HQ_ATC_SOCKET', daemon.path));
   onTestFinished(overrideEnv('ATC_SESSION_ID', 'id-stu'));
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'id-stu' }));
   await ctx.hq('call', 'add', 'KET-32', '--title', 'Pour widgets#8 now?', '--question', 'Boil?', '--body', 'Invented.');
   await ctx.hq('open');
 
@@ -1098,7 +1098,7 @@ test("hq call answer from a caller hq cannot place as the owner saves the answer
   await ctx.hq('call', 'add', 'KET-33', '--title', 'Pour widgets#9 now?', '--question', 'Boil?', '--body', 'Invented.');
   await ctx.hq('open');
 
-  const answered = await ctx.hq('call', 'answer', 'KET-33', '--answer', 'Yes', '--by', 'z-stu');
+  const answered = await ctx.hq('call', 'answer', 'KET-33', '--answer', 'Yes', '--by', 'stu');
 
   expect([answered.code, ctx.db.query("SELECT json_extract(data, '$.ownerSession') AS mark FROM events WHERE subject_id = 'KET-33' AND action = 'answered'").all()]).toStrictEqual([0, [{ mark: null }]]);
 });
@@ -1112,7 +1112,7 @@ test.each([
   onTestFinished(() => {
     OWNER_PROBE_OPENER.open = null;
   });
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'id-stu' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'id-stu' }));
   await ctx.hq('call', 'add', 'KET-34', '--title', 'Pour widgets#10 now?', '--question', 'Boil?', '--body', 'Invented.');
   await ctx.hq('open');
 

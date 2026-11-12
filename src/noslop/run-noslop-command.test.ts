@@ -113,13 +113,13 @@ test('it sets a repo\'s emergency review cap for the owner\'s session, shows it 
   expect(shown.data).toMatchObject({ repos: ['atc', 'tools'], caps: { tools: 2 } });
   expect(shown.text).toContain('emergency review cap: atc off, tools 2');
   expect(loadNoslopSettings(ctx.db)).toMatchObject({ repos: ['atc', 'tools'], caps: { tools: 2 } });
-  expect(ctx.db.query("SELECT action, actor FROM events WHERE subject_id = 'noslop' AND action = 'cap'").all()).toStrictEqual([{ action: 'cap', actor: 'z-stu' }]);
+  expect(ctx.db.query("SELECT action, actor FROM events WHERE subject_id = 'noslop' AND action = 'cap'").all()).toStrictEqual([{ action: 'cap', actor: 'stu' }]);
 });
 
 test('it refuses to change a repo\'s emergency review cap for another session, and stores nothing', async () => {
   const ctx = setupTest();
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest: ['tools', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).rejects.toMatchObject({ code: 'not_allowed', message: "only z-stu may change a repo's emergency review cap, and this session is not z-stu's" });
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest: ['tools', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'other' }) })).rejects.toMatchObject({ code: 'not_allowed', message: "only stu may change a repo's emergency review cap, and this session is not stu's" });
 
   expect(loadNoslopSettings(ctx.db).caps).toStrictEqual({});
   expect(ctx.db.query("SELECT action FROM events WHERE subject_id = 'noslop' AND action = 'cap'").all()).toStrictEqual([]);
@@ -128,7 +128,7 @@ test('it refuses to change a repo\'s emergency review cap for another session, a
 test('it refuses to change a repo\'s emergency review cap when atc cannot tell whose session it is, naming the cause', async () => {
   const ctx = setupTest();
 
-  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest: ['tools', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'unknown', cause: 'atc is not answering on the kettle socket' }) })).rejects.toMatchObject({ code: 'not_allowed', message: "hq could not check through atc that this is z-stu's session (atc is not answering on the kettle socket), so the emergency review cap is unchanged" });
+  await expect(runNoslopCommand({ run: buildFakeRunner().run, db: ctx.db, verb: 'cap', rest: ['tools', '2'], since: undefined, actor: 'tester', readOwnerSession: () => Promise.resolve({ verdict: 'unknown', cause: 'atc is not answering on the kettle socket' }) })).rejects.toMatchObject({ code: 'not_allowed', message: "hq could not check through atc that this is stu's session (atc is not answering on the kettle socket), so the emergency review cap is unchanged" });
 
   expect(loadNoslopSettings(ctx.db).caps).toStrictEqual({});
 });

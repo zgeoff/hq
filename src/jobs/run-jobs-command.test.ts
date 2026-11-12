@@ -10,7 +10,7 @@ import { readJobs } from './read-jobs.ts';
 function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
-  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-release': 'kettle-release', 'z-triage': 'kettle-triage', 'z-stu': 'kettle-stu' }));
+  setMeta(fresh.db, 'fleet_ids', JSON.stringify({ 'z-release': 'kettle-release', 'z-triage': 'kettle-triage', 'stu': 'kettle-stu' }));
   at('2026-11-10T00:00:00Z');
   const callAs = (peerSession: string | null, input: Pick<JobsCommandInput, 'verb' | 'rest' | 'flags'>) => {
     const client: OwnerProbeClient = { peerSession, close: () => {} };
@@ -35,7 +35,7 @@ test('it adds a job for a role when the caller is the owner', async () => {
 
   await ctx.callAs('kettle-stu', { verb: 'add', rest: ['z-release'], flags: { daily: '09:30Z', prompt: 'morning reading' } });
 
-  expect(readJobs(ctx.db, null).map((job) => ({ added_by: job.added_by, next_at: job.next_at }))).toStrictEqual([{ added_by: 'z-stu', next_at: '2026-11-10T09:30:00Z' }]);
+  expect(readJobs(ctx.db, null).map((job) => ({ added_by: job.added_by, next_at: job.next_at }))).toStrictEqual([{ added_by: 'stu', next_at: '2026-11-10T09:30:00Z' }]);
 });
 
 test('it refuses a job for z-release from another role', async () => {

@@ -350,7 +350,7 @@ test('it keeps every setting when processes set different ones at once', async (
   const go = String(Date.now() + 2000);
   const keys = ['nonnixMaxMib', 'nonnixMaxVcpus', 'impVcpus', 'cloudMinAvailGiB', 'claudeSevenDayPct', 'claudeFiveHourPct', 'opDailyPct', 'holdSamples'];
   const runs = keys.map((key) =>
-    Bun.spawn(['bun', '-e', `const { openDb } = await import(${JSON.stringify(join(import.meta.dir, '../src/db/open-db.ts'))}); const { setCapacitySetting } = await import(${JSON.stringify(join(import.meta.dir, '../src/capacity/set-capacity-setting.ts'))}); const db = openDb(); while (Date.now() < Number(process.env.GO)) {} setCapacitySetting(db, ${JSON.stringify(key)}, '7', 'z-stu');`], { env: { ...process.env, GO: go } }),
+    Bun.spawn(['bun', '-e', `const { openDb } = await import(${JSON.stringify(join(import.meta.dir, '../src/db/open-db.ts'))}); const { setCapacitySetting } = await import(${JSON.stringify(join(import.meta.dir, '../src/capacity/set-capacity-setting.ts'))}); const db = openDb(); while (Date.now() < Number(process.env.GO)) {} setCapacitySetting(db, ${JSON.stringify(key)}, '7', 'stu');`], { env: { ...process.env, GO: go } }),
   );
   const exits = await Promise.all(runs.map((run) => run.exited));
   expect(exits).toStrictEqual([0, 0, 0, 0, 0, 0, 0, 0]);
@@ -360,18 +360,18 @@ test('it keeps every setting when processes set different ones at once', async (
 test('settings: set, reset, bad key, bad value; each change is logged', () => {
   const ctx = setupTest();
   expect(capacitySettings(ctx.db).nonnixMaxMib).toBe(16_384);
-  expect(setCapacitySetting(ctx.db, 'nonnixMaxMib', '12000', 'z-stu').nonnixMaxMib).toBe(12_000);
+  expect(setCapacitySetting(ctx.db, 'nonnixMaxMib', '12000', 'stu').nonnixMaxMib).toBe(12_000);
   expect(capacitySettings(ctx.db).nonnixMaxMib).toBe(12_000);
-  expect(setCapacitySetting(ctx.db, 'nonnixMaxMib', null, 'z-stu').nonnixMaxMib).toBe(16_384);
-  expect(() => setCapacitySetting(ctx.db, 'bogus', '1', 'z-stu')).toThrow('unknown setting');
-  expect(() => setCapacitySetting(ctx.db, 'holdSamples', '-1', 'z-stu')).toThrow('0 or more');
-  expect(() => setCapacitySetting(ctx.db, 'holdSamples', 'x', 'z-stu')).toThrow('0 or more');
+  expect(setCapacitySetting(ctx.db, 'nonnixMaxMib', null, 'stu').nonnixMaxMib).toBe(16_384);
+  expect(() => setCapacitySetting(ctx.db, 'bogus', '1', 'stu')).toThrow('unknown setting');
+  expect(() => setCapacitySetting(ctx.db, 'holdSamples', '-1', 'stu')).toThrow('0 or more');
+  expect(() => setCapacitySetting(ctx.db, 'holdSamples', 'x', 'stu')).toThrow('0 or more');
   expect(ctx.db.query("SELECT COUNT(*) AS count FROM events WHERE action = 'setting' AND subject_id = 'capacity'").get()).toStrictEqual({ count: 2 });
 });
 
 test('holdSamples 1 opens on the first breach', async () => {
   const ctx = setupTest();
-  setCapacitySetting(ctx.db, 'holdSamples', '1', 'z-stu');
+  setCapacitySetting(ctx.db, 'holdSamples', '1', 'stu');
   await ctx.sampleAt(world({ nonnix: 20_000 }), minute(0));
   expect(Object.keys(openAlerts(ctx.db))).toStrictEqual(['impd:nonnix']);
 });

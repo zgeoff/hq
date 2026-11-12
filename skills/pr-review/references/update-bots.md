@@ -22,7 +22,7 @@ a weekly batch: review the batch in one sitting, each PR through `hq review`.
    - Merge it, under the `z-review-repo-sync` grant in your start prompt, when both hold:
      - Upstream also removes or changes every line the PR removes or changes.
      - Every line that only the repo's copy has stays in the PR.
-   - If it would lose a local edit, message `z-stu` the PR and the lines. `z-stu` decides.
+   - If it would lose a local edit, message `stu` the PR and the lines. `stu` decides.
 4. Any other reason: it waits for the owner's lgtm; file it with `hq unblock add` as holds.md says.
 
 ## The daily check of open Renovate PRs
@@ -40,7 +40,7 @@ Renovate runs as the `zgeoff-renovate` app, so `--author app/renovate` finds not
 
 For each, the first that fits:
 
-- **Archived repo:** leave it. For a security update, ask the owner through `z-stu` whether to
+- **Archived repo:** leave it. For a security update, ask the owner through `stu` whether to
   unarchive.
 - **A major of another package:** leave it for the weekly batch.
 - **CI running:** leave it for tomorrow.

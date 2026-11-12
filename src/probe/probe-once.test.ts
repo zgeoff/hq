@@ -88,7 +88,7 @@ test('two downs open one outage dated from the first; a third queues nothing mor
   const [alert] = readEvents(ctx.db, 'hq', 'probe', ['outage']);
   expect(readOutageRows(ctx.db)).toStrictEqual([{ id: 1, started_at: minute(1), detected_at: minute(2), ended_at: null, alert_seq: alert?.seq ?? null, recover_seq: null, kind: 'down' }]);
 
-  expect(readOutboxRows(ctx.db).map((row) => row.target)).toStrictEqual(['z-stu', 'z-delivery']);
+  expect(readOutboxRows(ctx.db).map((row) => row.target)).toStrictEqual(['stu', 'z-delivery']);
   expect(readOutboxRows(ctx.db)[0]).toMatchObject({ topic: 'nix-outage', status: 'pending' });
   expect(readOutboxRows(ctx.db)[1]?.text).toBe(readOutboxRows(ctx.db)[0]?.text);
   expect(readOutboxRows(ctx.db)[0]?.text).toContain('Nix is down: https://target.invalid/live failing since 12:01 (2 checks; control URL fine)');
@@ -132,7 +132,7 @@ test('an up closes the outage and queues one recovery message', async () => {
   expect(result.closed).toBe(1);
   expect(readOutageRows(ctx.db)[0]?.ended_at).toBe(minute(6));
   expect(readOutboxRows(ctx.db).map((row) => [row.target, row.text])).toStrictEqual([
-    ['z-stu', 'Nix is back: down 6 min (12:00–12:06 Sydney).'],
+    ['stu', 'Nix is back: down 6 min (12:00–12:06 Sydney).'],
     ['z-delivery', 'Nix is back: down 6 min (12:00–12:06 Sydney).'],
   ]);
   await ctx.step(7, UP);
@@ -264,7 +264,7 @@ test('the recovery message counts blind minutes as blind, as downtime() does', a
   }
   await ctx.step(60, UP);
   const window = downtime(ctx.db, new Date(T0), new Date(T0 + 60 * 60_000));
-  const back = readOutboxRows(ctx.db).find((row) => row.target === 'z-stu')?.text;
+  const back = readOutboxRows(ctx.db).find((row) => row.target === 'stu')?.text;
   expect(back).toBe(`Nix is back: down ${window.downMinutes} min (12:00–13:00 Sydney; hq could not see ${window.blindMinutes} min of it (the PC was offline)).`);
   expect(window.downMinutes).toBeLessThan(5);
 });
@@ -292,7 +292,7 @@ test('ready failing for 2 minutes alerts nobody; at 3 minutes one alert goes to 
   const result = await ctx.step(4, UNREADY);
   expect(result.unreadyOpened).toBe(1);
   expect(readOutageRows(ctx.db).map((row) => [row.id, row.kind, row.started_at, row.detected_at, row.ended_at])).toStrictEqual([[1, 'unready', minute(1), minute(4), null]]);
-  expect(readOutboxRows(ctx.db).map((row) => row.target)).toStrictEqual(['z-stu', 'z-delivery']);
+  expect(readOutboxRows(ctx.db).map((row) => row.target)).toStrictEqual(['stu', 'z-delivery']);
   expect(readOutboxRows(ctx.db)[0]).toMatchObject({ topic: 'nix-unready', status: 'pending' });
   expect(readOutboxRows(ctx.db)[0]?.text).toBe('Nix is unready: https://target.invalid/ready failing since 12:01 (4 checks; /health/live is fine). hq checks every minute and tells you when it is ready again.');
   expect(readOutboxRows(ctx.db)[1]?.text).toBe(readOutboxRows(ctx.db)[0]?.text);
@@ -311,7 +311,7 @@ test('the unready alert is not held over quiet hours', async () => {
   for (let offset = 0; offset <= 3; offset += 1) {
     await ctx.probeAt(iso(new Date(night + offset * 60_000)), UNREADY);
   }
-  expect(readOutboxRows(ctx.db).map((row) => [row.target, row.status])).toStrictEqual([['z-stu', 'pending'], ['z-delivery', 'pending']]);
+  expect(readOutboxRows(ctx.db).map((row) => [row.target, row.status])).toStrictEqual([['stu', 'pending'], ['z-delivery', 'pending']]);
 });
 
 test('the first ready sample closes the unready outage and says how long', async () => {
@@ -324,7 +324,7 @@ test('the first ready sample closes the unready outage and says how long', async
   expect(readOutageRows(ctx.db)[0]?.ended_at).toBe(minute(5));
   expect(ctx.db.query('SELECT recover_seq FROM outages').get()).toStrictEqual({ recover_seq: expect.any(Number) });
   expect(readOutboxRows(ctx.db).map((row) => [row.target, row.text])).toStrictEqual([
-    ['z-stu', 'Nix is ready again: unready 5 min (12:00–12:05 Sydney).'],
+    ['stu', 'Nix is ready again: unready 5 min (12:00–12:05 Sydney).'],
     ['z-delivery', 'Nix is ready again: unready 5 min (12:00–12:05 Sydney).'],
   ]);
   await ctx.step(6, UP);

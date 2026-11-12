@@ -40,17 +40,17 @@ test('adding news sends nothing; the digest groups unread items by topic', () =>
 test('read --upto marks only items up to that id; a later item stays unread', () => {
   item();
   item();
-  expect(readNews(db, 1, 'z-stu')).toBe(1);
+  expect(readNews(db, 1, 'stu')).toBe(1);
   expect(listNews(db, { all: false, limit: 200 }).map((n) => n.id)).toEqual([2]);
   expect(listNews(db, { all: true, limit: 200 }).map((n) => n.id)).toEqual([1, 2]);
-  expect(readNews(db, 1, 'z-stu')).toBe(0);
+  expect(readNews(db, 1, 'stu')).toBe(0);
   expect(digest([])).toBe('No unread news.');
 });
 
-test('--needs-geoff tells z-stu at once, unless z-stu filed it', () => {
+test('it tells stu of a --needs-geoff line at once, unless stu filed it', () => {
   item({ topic: 'fix', text: 'The teapot fix needs a yes before deploy.', needsGeoff: true });
-  expect(readOutboxRows(db).map((row) => ({ target: row.target, text: row.text }))).toStrictEqual([{ target: 'z-stu', text: 'News 1 needs the owner, from z-delivery: The teapot fix needs a yes before deploy. [GEO-9001]' }]);
-  item({ from: 'z-stu', needsGeoff: true });
+  expect(readOutboxRows(db).map((row) => ({ target: row.target, text: row.text }))).toStrictEqual([{ target: 'stu', text: 'News 1 needs the owner, from z-delivery: The teapot fix needs a yes before deploy. [GEO-9001]' }]);
+  item({ from: 'stu', needsGeoff: true });
   expect(readOutboxRows(db)).toHaveLength(1);
 });
 
@@ -64,7 +64,7 @@ test('bad input is refused', () => {
   expect(() => item({ text: 'x'.repeat(401) })).toThrow('400');
   expect(() => item({ issue: 'geo-1' })).toThrow('GEO-123');
   expect(() => item({ link: 'ftp://x' })).toThrow('http(s)');
-  expect(() => readNews(db, 0, 'z-stu')).toThrow('--upto');
+  expect(() => readNews(db, 0, 'stu')).toThrow('--upto');
 });
 
 test('a limited digest shows the oldest unread, so its read hint covers only what it showed', () => {
@@ -74,7 +74,7 @@ test('a limited digest shows the oldest unread, so its read hint covers only wha
   const shown = listNews(db, { all: false, limit: 2 });
   expect(shown.map((n) => n.id)).toEqual([1, 2]);
   expect(digest(shown, { more: 1 })).toContain('(hq news read --upto 2 marks these read; 1 more unread after them)');
-  readNews(db, 2, 'z-stu');
+  readNews(db, 2, 'stu');
   expect(listNews(db, { all: false, limit: 2 }).map((n) => n.id)).toEqual([3]);
   expect(digest(listNews(db, { all: true, limit: 2 }), { all: true })).not.toContain('read --upto');
 });

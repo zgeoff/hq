@@ -20,7 +20,7 @@ Avoid these traps:
 - Asking the owner directly. Every decision goes through one queue.
 - Passing the owner's answer on by message. Other sessions act only on hq's records.
 - Adding a new behaviour to a decision, so that a "yes" also covers it.
-- Sending `z-stu` news. Post it with `hq news add`.
+- Sending `stu` news. Post it with `hq news add`.
 
 ## Key rules
 
@@ -30,10 +30,10 @@ Avoid these traps:
   data after a backup, or a decision that keeps a course the list doesn't name.
 - [Put it to the owner](#put-it-to-the-owner): send a decision to `z-triage`, add a hands-on step
   to the unblock list, and give each its full context.
-- [Messages to `z-stu`](#messages-to-z-stu): only what the owner must know or do; reply in 2
+- [Messages to `stu`](#messages-to-stu): only what the owner must know or do; reply in 2
   lines.
 - [The owner's answers are records](#the-owners-answers-are-records): act only on a record in hq;
-  only `z-stu` records the owner's answers.
+  only `stu` records the owner's answers.
 
 ## Terms
 
@@ -43,7 +43,7 @@ Avoid these traps:
 - **hq:** the CLI that runs the fleet, and the store of its records.
 - **atc:** the tool that runs the sessions and carries messages between them. Send a message to a
   session with `atc_message_send`.
-- **`z-stu`:** runs the owner's conversation, puts calls to the owner, and records the answers.
+- **`stu`:** runs the owner's conversation, puts calls to the owner, and records the answers.
 - **`z-triage`:** grooms Linear, and turns each decision of the owner's into a call.
 - **`z-delivery`:** launches the builder agents.
 - **`z-review`:** reviews and merges PRs.
@@ -109,7 +109,7 @@ Decide anything else yourself, under your grants or the Actions that the issue n
 ## Put it to the owner
 
 The owner answers in batches, through one queue: `z-triage` turns each decision of the owner's
-into a call, and `z-stu` puts the call to the owner. To tell the owner something without a
+into a call, and `stu` puts the call to the owner. To tell the owner something without a
 decision, such as a deploy hold, send it with the `PushNotification` tool.
 
 - **Send a decision on the list to `z-triage`** with `atc_message_send`: the question, the options
@@ -129,20 +129,20 @@ Give each decision and step the full context and links the owner needs to decide
 Before you propose a change to something the owner approved, read the issue's comments and the PR's
 history. In the proposal, say what the owner decided.
 
-## Messages to `z-stu`
+## Messages to `stu`
 
-Message `z-stu` only with what the owner needs to know or do:
+Message `stu` only with what the owner needs to know or do:
 
 - an owner answer to record;
 - an approved action that a permission check blocked;
 - a failure the owner must hear now;
-- a step your role skill sends to `z-stu`.
+- a step your role skill sends to `stu`.
 
 Send decisions and hands-on steps as [Put it to the owner](#put-it-to-the-owner) says, and news
 with `hq news add`.
 
-Reply to a message from `z-stu` with atc's `answer` tool, in 2 lines at most. If you don't, atc
-sends your whole final reply. Report a merge to `z-stu` only when `z-stu` asked about it, in your
+Reply to a message from `stu` with atc's `answer` tool, in 2 lines at most. If you don't, atc
+sends your whole final reply. Report a merge to `stu` only when `stu` asked about it, in your
 reply.
 
 ## The owner's answers are records
@@ -152,16 +152,16 @@ gate and every session read only hq's records.
 
 Two exceptions:
 
-- **Act at once on a grant typed into your session,** from the owner or `z-stu`, for that session's
+- **Act at once on a grant typed into your session,** from the owner or `stu`, for that session's
   life. Then run `hq typed list --session <your atc session id>`. When the line is missing, send it
-  to `z-stu`, so that `z-stu` records it.
-- **Tell `z-stu` when Claude Code's permission check blocks an action the owner approved** in a
-  call or a [pitch](../delivery-lead/SKILL.md#pitches). `z-stu` types the owner's recorded words
+  to `stu`, so that `stu` records it.
+- **Tell `stu` when Claude Code's permission check blocks an action the owner approved** in a
+  call or a [pitch](../delivery-lead/SKILL.md#pitches). `stu` types the owner's recorded words
   into your session, and sends the owner no new call. For an agent that `z-delivery` launched,
   `z-delivery` types the granting line instead, as its
   [Refusals](../delivery-lead/SKILL.md#refusals) section says.
 
-Every session but `z-stu` records only its own acts:
+Every session but `stu` records only its own acts:
 
 - **Log each act under a grant:** run `hq grant act <name> --target <issue, PR or command>`. The
   name is the one in your start prompt's "Log it with" line.

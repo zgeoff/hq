@@ -44,7 +44,7 @@ test('a cap turns the lanes segment into working over the cap, with the pool siz
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
   await ctx.seed.capacitySample({ at: '2026-10-15T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'z-stu', at: '2026-10-15T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-18T21:00:00Z', reason: 'weekend pacing', by: 'stu', at: '2026-10-15T00:00:00Z' }));
   await main(['run', 'add', 'GEO-9601', '--title', 'Fit the long spout', '--where', 'imp', '--json']);
 
   const band = await loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z'));
@@ -56,7 +56,7 @@ test('a cap with no until leaves the until out of the lanes segment', async () =
   const ctx = setupTest();
   writeFileSync(ctx.pacing, JSON.stringify({ imp: { impMib: 2048 }, lanes: { imp: { cleanup: 3 }, local: { flexible: 1 } } }));
   await ctx.seed.capacitySample({ at: '2026-10-15T00:55:00Z', nonnix_awake_mib: 8192, nonnix_awake_vcpus: 6 });
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 3, until: null, reason: null, by: 'z-stu', at: '2026-10-15T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 3, until: null, reason: null, by: 'stu', at: '2026-10-15T00:00:00Z' }));
 
   const band = await loadBand(ctx.db, ctx.pacing, new Date('2026-10-15T01:00:00Z'));
 

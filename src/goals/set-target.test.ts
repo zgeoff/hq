@@ -14,8 +14,8 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 test('an override moves the value and keeps the deadline and the detection limit', () => {
-  setTarget(db, 'bugs', '<=', '15', 'z-stu');
-  setTarget(db, 'downtime', '<', '10', 'z-stu');
+  setTarget(db, 'bugs', '<=', '15', 'stu');
+  setTarget(db, 'downtime', '<', '10', 'stu');
   const { targets, overridden } = goalTargets(db);
   expect(targets.bugs).toEqual({ op: '<=', value: 15, until: '2026-11-02' });
   expect(targets.downtime).toEqual({ op: '<', value: 10, detectMax: 5 });
@@ -24,29 +24,29 @@ test('an override moves the value and keeps the deadline and the detection limit
 });
 
 test('none clears a target, and a cost target can be set', () => {
-  setTarget(db, 'ciwaste', 'none', undefined, 'z-stu');
+  setTarget(db, 'ciwaste', 'none', undefined, 'stu');
   expect(goalTargets(db).targets.ciwaste).toBeNull();
-  setTarget(db, 'cost', '<', '80', 'z-stu');
+  setTarget(db, 'cost', '<', '80', 'stu');
   expect(goalTargets(db).targets.cost).toEqual({ op: '<', value: 80 });
-  setTarget(db, 'cost', 'none', undefined, 'z-stu');
+  setTarget(db, 'cost', 'none', undefined, 'stu');
   expect(goalTargets(db).targets.cost).toBeNull();
 });
 
 test('a cleared target set again gets its deadline and detection limit back from the default', () => {
-  setTarget(db, 'downtime', 'none', undefined, 'z-stu');
-  setTarget(db, 'downtime', '<', '20', 'z-stu');
+  setTarget(db, 'downtime', 'none', undefined, 'stu');
+  setTarget(db, 'downtime', '<', '20', 'stu');
   expect(goalTargets(db).targets.downtime).toEqual({ op: '<', value: 20, detectMax: 5 });
-  setTarget(db, 'bugs', 'none', undefined, 'z-stu');
-  setTarget(db, 'bugs', '<', '25', 'z-stu');
+  setTarget(db, 'bugs', 'none', undefined, 'stu');
+  setTarget(db, 'bugs', '<', '25', 'stu');
   expect(goalTargets(db).targets.bugs).toEqual({ op: '<', value: 25, until: '2026-11-02' });
 });
 
 test('every change logs an event with the old and the new target', () => {
-  setTarget(db, 'features', '>=', '65', 'z-stu');
-  setTarget(db, 'features', 'none', undefined, 'z-stu');
+  setTarget(db, 'features', '>=', '65', 'stu');
+  setTarget(db, 'features', 'none', undefined, 'stu');
   expect(db.query("SELECT actor, from_state, to_state FROM events WHERE subject = 'hq' AND subject_id = 'goals' AND action = 'target' ORDER BY seq").all()).toEqual([
-    { actor: 'z-stu', from_state: '>=60', to_state: '>=65' },
-    { actor: 'z-stu', from_state: '>=65', to_state: 'none' },
+    { actor: 'stu', from_state: '>=60', to_state: '>=65' },
+    { actor: 'stu', from_state: '>=65', to_state: 'none' },
   ]);
 });
 
@@ -75,17 +75,17 @@ const HOSTILE: [string, string, string | undefined, string][] = [
   ['bugs', 'none', '5', 'none takes no value'],
 ];
 test.each(HOSTILE)('hq goals target %p %p %p is refused', (key, op, value, why) => {
-  expect(() => setTarget(db, key, op, value, 'z-stu')).toThrow(why);
+  expect(() => setTarget(db, key, op, value, 'stu')).toThrow(why);
   expect(goalTargets(db).overridden).toEqual([]);
   expect(db.query("SELECT COUNT(*) AS n FROM events WHERE action = 'target'").get()).toEqual({ n: 0 });
 });
 
 test('it takes a cost target in dollars a month, over 100', () => {
-  expect(setTarget(db, 'cost', '<=', '250', 'z-stu')).toStrictEqual({ op: '<=', value: 250 });
+  expect(setTarget(db, 'cost', '<=', '250', 'stu')).toStrictEqual({ op: '<=', value: 250 });
 });
 
 test('downtime takes minutes up to a week, other goals up to 100', () => {
-  expect(() => setTarget(db, 'downtime', '<', '10080', 'z-stu')).not.toThrow();
-  expect(() => setTarget(db, 'bugs', '<', '100', 'z-stu')).not.toThrow();
-  expect(() => setTarget(db, 'bugs', '>', '0.5', 'z-stu')).not.toThrow();
+  expect(() => setTarget(db, 'downtime', '<', '10080', 'stu')).not.toThrow();
+  expect(() => setTarget(db, 'bugs', '<', '100', 'stu')).not.toThrow();
+  expect(() => setTarget(db, 'bugs', '>', '0.5', 'stu')).not.toThrow();
 });

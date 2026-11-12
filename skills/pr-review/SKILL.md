@@ -112,7 +112,7 @@ Final message is cut to 7 characters. Merge a stack as stacks.md says.
 - **zgeoff/cloud and zgeoff/vers:** a merge deploys, so send the `z-release` message in
   [After the merge](#after-the-merge) as soon as the merge lands, before step 1.
 - **A PR the gate refuses only because noslop could not check the fixes:** read each fix commit at
-  the PR's head, to check that it fixes its finding. Then leave the PR unmerged, and message `z-stu`
+  the PR's head, to check that it fixes its finding. Then leave the PR unmerged, and message `stu`
   the PR with your verdict on each fix. No grant in your start prompt covers that merge.
 - **Merge only in the repos that the merge grants in your start prompt name.** When a GitHub ruleset
   refuses a merge, send the PR and the refusal to `z-delivery`.
@@ -130,7 +130,7 @@ Once `gh pr view <n> -R zgeoff/<repo> --json state,mergeCommit` shows `MERGED`:
    - If it owes one, move it to In Review, and leave its delivery run at `live-check` for `z-qa`.
 2. Message `z-release` "merged, ready to release: <repo>#<n> <merge sha> (GEO-n)", leaving out the
    issue when the PR has none. Add `test-only` to that message when every changed path is a test.
-   For a PR another session sent, tell that session instead. For a PR `z-stu` sent, post the merge
+   For a PR another session sent, tell that session instead. For a PR `stu` sent, post the merge
    with `hq news add --topic merge`.
 3. Post it to `hq news` when the owner would notice the change, such as a deploy or a skill change.
 

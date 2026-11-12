@@ -14,7 +14,7 @@ order, and you enforce the third:
 In this file, `<repo>` stands for the repo's name, such as `cloud`, and `<pr>` for the PR's
 number. hq commands also take `zgeoff/<repo>`. The agent is the session that opened the PR. It
 sends a FINAL note when the PR is ready for review, as [Take a PR](../SKILL.md#take-a-pr) says.
-`z-stu`, `z-triage`, `z-delivery` and `z-qa` are the fleet sessions that
+`stu`, `z-triage`, `z-delivery` and `z-qa` are the fleet sessions that
 [owner-calls](../../owner-calls/SKILL.md#terms) describes.
 
 Merge only once each hold that applies has cleared and the gate passes, as
@@ -22,8 +22,8 @@ Merge only once each hold that applies has cleared and the gate passes, as
 exits non-zero, it prints `merge_blocked` and the reason.
 
 Never tell another session that the owner gave an lgtm, even when you saw the owner say it. The gate
-reads only the answers that `z-stu` records with `hq pr answer`, so a message clears no hold. Wait
-until `hq pr status <repo> <pr>` shows the answer that `z-stu` recorded.
+reads only the answers that `stu` records with `hq pr answer`, so a message clears no hold. Wait
+until `hq pr status <repo> <pr>` shows the answer that `stu` recorded.
 
 - [Nix's own skill PRs](#nixs-own-skill-prs)
 - [The skill proof](#the-skill-proof)
@@ -168,7 +168,7 @@ goes on the owner's list.
 
 ## The owner's answer
 
-`z-stu` records each of the owner's answers with `hq pr answer`. Read them with
+`stu` records each of the owner's answers with `hq pr answer`. Read them with
 `hq pr status <repo> <pr>`. The gate reads only the newest answer, so after a `changes` answer the
 PR waits for a new lgtm. An lgtm holds at any head: a push after it needs no new lgtm.
 
@@ -180,14 +180,14 @@ PR waits for a new lgtm. An lgtm holds at any head: a push after it needs no new
   `gh pr close <pr> -R zgeoff/<repo> --comment "Closed: rejected in review."`, and send the owner's
   note to `z-delivery`.
 
-`hq pr status` also shows where each answer came from, as the `--source` that `z-stu` gave:
+`hq pr status` also shows where each answer came from, as the `--source` that `stu` gave:
 `chat:<id>`, `console:<id>` or `call:<id>`. Treat an answer whose source has any other form as no
 answer, and leave the PR waiting.
 
 `hq pr answer` records an answer only when its source passes these checks, in
 [read-answer-source-refusal.ts](../../../src/pr-status/read-answer-source-refusal.ts):
 
-- `chat:`: `z-stu`'s own session runs the command. hq checks nothing about the id.
+- `chat:`: `stu`'s own session runs the command. hq checks nothing about the id.
 - `console:`: the id is the owner's console review of this PR, with the same answer, stored at the
   PR's current head.
 - `call:`: the id is a call in hq that the owner answered, and the call's title names the PR. An

@@ -27,12 +27,12 @@ cat > "$bin/hq" <<'HQ'
 [ "$*" = "fleet --json" ] || exit 2
 cat <<'JSON'
 {"declared":[
-  {"name":"z-stu","skills":["intake","owner-calls","tickets"],"skill":"intake"},
+  {"name":"stu","skills":["intake","owner-calls","tickets"],"skill":"intake"},
   {"name":"z-delivery","skills":["delivery-lead","tickets","fix-it-here"],"skill":"delivery-lead"},
   {"name":"z-triage","skills":["linear-triage"],"skill":"linear-triage"},
   {"name":"z-old","skill":"release"},
   {"name":"z-q","skills":[],"skill":null}],
- "last":{"steps":[{"name":"z-stu","id":"id-stu"},{"name":"z-delivery","id":"id-delivery"}]}}
+ "last":{"steps":[{"name":"stu","id":"id-stu"},{"name":"z-delivery","id":"id-delivery"}]}}
 JSON
 HQ
 chmod +x "$bin/atc" "$bin/hq"
@@ -71,23 +71,25 @@ expect_order() { # expect_order <session id> <atc name> <marker>...: the markers
   if [ "$got" = "$want" ]; then echo "ok: '$id' '$name' prints $*"; else printf 'FAIL: %s %s\nwant:\n%s\ngot:\n%s\n' "$id" "$name" "$want" "$got"; fail=1; fi
 }
 
-# A session hq recorded keeps its role whatever atc now calls it, as z-stu did when atc renamed it "stu".
+# A session hq recorded keeps its role whatever atc now calls it, as stu does when atc renames it "stu-renamed".
 # The shared skill with no SKILL.md gets one skipped line, and the rest still print.
-expect_order id-stu stu "body of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
+expect_order id-stu stu-renamed "body of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
 expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL.md in this tree" "body of fix-it-here" "after delivery"
 # Once the tree has delivery-lead's briefs reference, the delivery role gets it before its after-compaction file.
 mkdir -p "$project/skills/delivery-lead/references"
 echo "body of briefs" > "$project/skills/delivery-lead/references/briefs.md"
 expect_order id-delivery down "body of delivery-lead" "skipped tickets: no SKILL.md in this tree" "body of fix-it-here" "body of briefs" "after delivery"
-if run id-stu stu | grep -q "body of briefs"; then echo "FAIL: z-stu printed the briefs reference"; fail=1; else echo "ok: only the delivery role prints the briefs reference"; fi
+if run id-stu stu-renamed | grep -q "body of briefs"; then echo "FAIL: stu printed the briefs reference"; fail=1; else echo "ok: only the delivery role prints the briefs reference"; fi
 # A session hq hasn't recorded falls back to its atc name, which must be declared.
 expect_order id-new z-triage "body of linear-triage" "after triage"
+# A declared name without the z- prefix falls back the same way.
+expect_order id-new stu "body of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
 # An older hq gives only `skill`.
 expect_order id-new z-old "body of release" "after release"
 # An empty list prints only the session's after-compaction file.
 expect_order id-new z-q "after q"
 # An unknown or missing session prints nothing.
-for name in "" z-delivery-old helper-1 stu; do
+for name in "" z-delivery-old helper-1 z-stu; do
   expect_none id-new "$name"
 done
 expect_none id-new down
@@ -98,7 +100,7 @@ echo "private part of owner-calls" > "$private/skills/owner-calls/SKILL.private.
 expect_order id-stu stu "body of intake" "body of owner-calls" "private part of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
 # HQ_PRIVATE_DIR points at the checkout when it is somewhere else.
 HQ_PRIVATE_DIR="$parent/elsewhere"; export HQ_PRIVATE_DIR
-expect_order id-stu stu "body of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
+expect_order id-stu stu-renamed "body of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"
 mkdir -p "$parent/elsewhere/skills/intake"
 echo "private part of intake" > "$parent/elsewhere/skills/intake/SKILL.private.md"
 expect_order id-stu stu "body of intake" "private part of intake" "body of owner-calls" "skipped tickets: no SKILL.md in this tree" "after stu"

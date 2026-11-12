@@ -22,7 +22,7 @@ function setupTest() {
 test.each([
   { name: 'no source', flags: {}, probe: { verdict: 'owner' } },
   { name: 'a blank source', flags: { source: '  ' }, probe: { verdict: 'owner' } },
-  { name: 'a typed source', flags: { source: 'typed:z-stu' }, probe: { verdict: 'owner' } },
+  { name: 'a typed source', flags: { source: 'typed:stu' }, probe: { verdict: 'owner' } },
   { name: 'a rebased source', flags: { source: 'rebased:a1b2c3d' }, probe: { verdict: 'owner' } },
   { name: "a chat source from a session that isn't the owner's", flags: { source: 'chat:kettle-1' }, probe: { verdict: 'other' } },
   { name: 'a chat source atc cannot place', flags: { source: 'chat:kettle-1' }, probe: { verdict: 'unknown', cause: 'atc is down' } },

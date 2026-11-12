@@ -51,6 +51,7 @@ import { selfCommand } from './restart/self-command.ts';
 import { loadBand } from './band/load-band.ts';
 import { loadPane } from './band/load-pane.ts';
 import { findFleetName } from './atc/find-fleet-name.ts';
+import { readWhois } from './atc/read-whois.ts';
 import { createStoreBackup } from './noslop/create-store-backup.ts';
 import { runNoslopCommand } from './noslop/run-noslop-command.ts';
 import { readOwnerSession } from './pr-status/read-owner-session.ts';
@@ -2000,8 +2001,8 @@ const GROUPS: Record<string, (context: Ctx) => Promise<Out>> = {
   },
   whois: (c) => {
     const id = need(c.verb, 'session-id');
-    const name = findFleetName(c.db, id);
-    return Promise.resolve({ data: { session: id, name }, text: name ?? `${id} is no declared fleet session` });
+    const whois = readWhois(c.db, id);
+    return Promise.resolve({ data: { ...whois }, text: whois.name ?? `${id} is no declared fleet session` });
   },
   console: async (command) => {
     if (command.verb === 'login') {

@@ -155,9 +155,9 @@ the date, such as `2026-03-14`, or `week of` and the Monday, such as `week of 20
 Anyone with the link can read a secret gist, so send the link only to the owner, with the totals
 line, in your reply to his request. Never delete a gist: the owner deletes them.
 
-When `z-stu` starts you as a subagent for its
+When `stu` starts you as a subagent for its
 [morning reports](../intake/references/morning-reports.md), your brief says so. Return the link and
-the totals line to `z-stu` instead of sending them.
+the totals line to `stu` instead of sending them.
 
 To update a report, run every step again for the same period. Find the gist's ID with
 `gh gist list`, by its description. Replace the file with `gh gist edit <gist ID> -f <file> <file>`,

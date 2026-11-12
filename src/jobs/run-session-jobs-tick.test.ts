@@ -70,7 +70,7 @@ test('it fires a job once after downtime across several slots, then moves to the
 test('it moves a daily job to the same time tomorrow after it fires', () => {
   const ctx = setupTest();
   at('2026-11-10T00:00:00Z');
-  writeJob(ctx.db, { target: 'z-delivery', value: { kind: 'daily', spec: '09:30Z' }, prompt: 'run the nightly batch', nextAt: new Date('2026-11-10T09:30:00Z'), actor: 'z-stu' });
+  writeJob(ctx.db, { target: 'z-delivery', value: { kind: 'daily', spec: '09:30Z' }, prompt: 'run the nightly batch', nextAt: new Date('2026-11-10T09:30:00Z'), actor: 'stu' });
 
   runSessionJobsTick(ctx.db, 'hq', new Date('2026-11-10T09:32:00Z'));
 

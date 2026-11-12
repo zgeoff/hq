@@ -33,7 +33,7 @@ function setupTest() {
   const fresh = freshDb();
   onTestFinished(fresh.cleanup);
   updateEnv('HQ_NOTIFY', 'off');
-  updateEnv('HQ_AS', 'z-stu');
+  updateEnv('HQ_AS', 'stu');
   const out: string[] = [];
   const log = spyOn(console, 'log').mockImplementation((line: string) => out.push(line));
   onTestFinished(() => log.mockRestore());
@@ -207,14 +207,15 @@ test('shape: fleet shows promptCheck for a declared session that is live in atc,
     const prompted = await ctx.hq('fleet', '--prompts');
     const entrySchema = z.object({ name: z.string(), prompt: z.string(), promptCheck: z.unknown().optional() });
     const json = z.object({ declared: z.array(entrySchema) }).parse(prompted.json);
-    const stu = json.declared.find((e) => e.name === 'z-stu')!;
+    const stu = json.declared.find((entry) => entry.name === 'stu');
+    invariant(stu);
     expect(typeof stu.prompt).toBe('string');
     expect(stu.promptCheck).toEqual({ state: 'unknown', since: null, hint: null, reason: expect.stringContaining('no prompt') });
     expect(json.declared.some((entry) => entry.promptCheck === undefined)).toBe(true);
     checkShape('fleet', prompted.json);
     ctx.out.length = 0;
     expect(await main(['fleet'])).toBe(0);
-    expect(ctx.out.join('\n')).toContain('z-stu: prompt check unknown (atc gave no prompt for the session)');
+    expect(ctx.out.join('\n')).toContain('stu: prompt check unknown (atc gave no prompt for the session)');
   } finally {
     atc.stop();
     delete process.env['HQ_ATC_SOCKET'];
@@ -229,7 +230,7 @@ test("shape: fleet --prompts gives pluginCheck for a live session whose plugin f
     const ran = await ctx.hq('fleet', '--prompts');
     const entrySchema = z.object({ name: z.string(), pluginCheck: z.unknown().optional() });
     const withPlugins = z.object({ declared: z.array(entrySchema) }).parse(ran.json).declared.filter((entry) => entry.pluginCheck !== undefined);
-    expect(withPlugins).toStrictEqual([{ name: 'z-stu', pluginCheck: { declared: ['~/projects/hq/mods/hq-band'], running: [] } }]);
+    expect(withPlugins).toStrictEqual([{ name: 'stu', pluginCheck: { declared: ['~/projects/hq/mods/hq-band'], running: [] } }]);
     checkShape('fleet', ran.json);
   } finally {
     atc.stop();
@@ -244,7 +245,7 @@ test("hq fleet's text names a live session whose plugin folders differ from flee
   try {
     const code = await main(['fleet']);
     expect(code).toBe(0);
-    expect(ctx.out.join('\n')).toContain('z-stu: plugin folders differ: declared ~/projects/hq/mods/hq-band, running none — a respawn loads the declared ones');
+    expect(ctx.out.join('\n')).toContain('stu: plugin folders differ: declared ~/projects/hq/mods/hq-band, running none — a respawn loads the declared ones');
   } finally {
     atc.stop();
     delete process.env['HQ_ATC_SOCKET'];

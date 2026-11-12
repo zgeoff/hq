@@ -125,7 +125,7 @@ test('withDeadline passes a result through and clears its timer', async () => {
   await expect(withDeadline(Promise.reject(new Error('inner')), 50, 'x')).rejects.toThrow('inner');
 });
 
-test('a watcher with no tick for 15 min alerts z-stu once, and once more when it recovers', async () => {
+test('it alerts stu once for a watcher with no tick for 15 min, and once more when it recovers', async () => {
   const ctx = setupTest();
   for (const key of ['kinds_synced_at', 'goals_synced_at', 'goals_ok_at', 'kinds_ok_at', 'linear_synced_at', 'lanes_ready_linear_at']) {
     ctx.seed.meta({ key, value: new Date().toISOString() });
@@ -140,11 +140,11 @@ test('a watcher with no tick for 15 min alerts z-stu once, and once more when it
   expect(watcherAlert(ctx.db, 'hq-fleet')).toBe('alerted');
   at('2026-10-15T20:20:00Z');
   expect(watcherAlert(ctx.db, 'hq-fleet')).toBeNull();
-  expect(readOutboxRows(ctx.db).map((row) => ({ target: row.target, topic: row.topic }))).toStrictEqual([{ target: 'z-stu', topic: 'watcher-stale' }]);
+  expect(readOutboxRows(ctx.db).map((row) => ({ target: row.target, topic: row.topic }))).toStrictEqual([{ target: 'stu', topic: 'watcher-stale' }]);
   expect(readOutboxRows(ctx.db)[0]?.text).toContain('no completed tick for 15 min (last 2026-10-15T20:00:00Z)');
   await watchTick(ctx.db, ctx.deps());
   expect(watcherAlert(ctx.db, 'hq-fleet')).toBe('recovered');
-  expect(readOutboxRows(ctx.db).at(-1)?.target).toBe('z-stu');
+  expect(readOutboxRows(ctx.db).at(-1)?.target).toBe('stu');
   expect(readOutboxRows(ctx.db).at(-1)?.text).toContain('ticking again');
   expect(watcherAlert(ctx.db, 'hq-fleet')).toBeNull();
 });

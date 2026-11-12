@@ -108,7 +108,7 @@ test('it does not queue at once when the newest item is dropped and an older one
   createUnblockItems(ctx.db, { kettle: { task: 'Try the new kettle' }, toaster: { task: 'Try the new toaster' } });
   runUnblockChangedTick(ctx.db, 'hq-lanes', new Date('2026-10-21T01:00:00Z'));
   ctx.clearOutbox();
-  closeUnblock(ctx.db, 'toaster', 'dropped', null, 'z-stu');
+  closeUnblock(ctx.db, 'toaster', 'dropped', null, 'stu');
 
   expect(runUnblockChangedTick(ctx.db, 'hq-lanes', new Date('2026-10-21T01:05:00Z'))).toBe(false);
   expect(ctx.readOutbox()).toStrictEqual([]);
@@ -119,7 +119,7 @@ test('it queues again after 60 minutes when the newest item is dropped and an ol
   createUnblockItems(ctx.db, { kettle: { task: 'Try the new kettle' }, toaster: { task: 'Try the new toaster' } });
   runUnblockChangedTick(ctx.db, 'hq-lanes', new Date('2026-10-21T01:00:00Z'));
   ctx.clearOutbox();
-  closeUnblock(ctx.db, 'toaster', 'dropped', null, 'z-stu');
+  closeUnblock(ctx.db, 'toaster', 'dropped', null, 'stu');
 
   expect(runUnblockChangedTick(ctx.db, 'hq-lanes', new Date('2026-10-21T02:00:00Z'))).toBe(true);
   expect(ctx.readOutbox()).toHaveLength(1);
@@ -130,7 +130,7 @@ test('it stops once the push moves the cursor past the items', () => {
   createUnblockItems(ctx.db, { kettle: { task: 'Try the new kettle' } });
   runUnblockChangedTick(ctx.db, 'hq-lanes', new Date('2026-10-21T01:00:00Z'));
   ctx.clearOutbox();
-  markPushed(ctx.db, uptoFor(newSincePush(ctx.db), ctx.db), 'z-stu');
+  markPushed(ctx.db, uptoFor(newSincePush(ctx.db), ctx.db), 'stu');
 
   expect(runUnblockChangedTick(ctx.db, 'hq-lanes', new Date('2026-10-21T02:00:00Z'))).toBe(false);
   expect(ctx.readOutbox()).toStrictEqual([]);

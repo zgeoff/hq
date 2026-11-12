@@ -51,13 +51,13 @@ test('the windows: all of yesterday and today to 08:30, a 23-hour day at the DST
   );
 });
 
-test('fires once per Sydney day from 08:15, queued to z-stu; late after 08:45', () => {
+test('it fires once per Sydney day from 08:15, queued to stu; late after 08:45', () => {
   const ctx = setupTest();
   expect(morningTick(ctx.db, 'hq-lanes', syd('2026-10-17', '08:14'))).toBeNull();
   const result = morningTick(ctx.db, 'hq-lanes', syd('2026-10-17', '08:16'));
   expect(result).toMatchObject({ job: 'morning-reports', key: '2026-10-17', result: 'queued', detail: null });
   const queued = readOutboxRows(ctx.db);
-  expect(queued.map((row) => ({ target: row.target, status: row.status, topic: row.topic }))).toStrictEqual([{ target: 'z-stu', status: 'pending', topic: 'job:morning-reports:2026-10-17' }]);
+  expect(queued.map((row) => ({ target: row.target, status: row.status, topic: row.topic }))).toStrictEqual([{ target: 'stu', status: 'pending', topic: 'job:morning-reports:2026-10-17' }]);
   expect(queued[0]?.text).toContain('Morning reports due. Both windows');
   expect(morningTick(ctx.db, 'hq-lanes', syd('2026-10-17', '08:21'))).toBeNull();
   expect(morningTick(ctx.db, 'hq-lanes', syd('2026-10-17', '23:59'))).toBeNull();
@@ -72,7 +72,7 @@ test('fires once per Sydney day from 08:15, queued to z-stu; late after 08:45', 
 
 test('a skipped morning is left alone; bad skips are refused', () => {
   const ctx = setupTest();
-  skipMorning(ctx.db, '2026-10-16', 'z-stu ran them by hand', 'z-q');
+  skipMorning(ctx.db, '2026-10-16', 'stu ran them by hand', 'z-q');
   expect(morningTick(ctx.db, 'hq-lanes', syd('2026-10-16', '09:00'))).toBeNull();
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
   expect(() => skipMorning(ctx.db, '2026-10-16', 'again', 'z-q')).toThrow('already ran (skipped');
@@ -99,7 +99,7 @@ test('hq health: quiet before 08:45, then flags a missing run or a failed send',
 
 test('it sees a failed morning message queued while the owner session is forwarded', () => {
   const ctx = setupTest();
-  setForward(ctx.db, 'z-stu', 'z-other');
+  setForward(ctx.db, 'stu', 'z-other');
   morningTick(ctx.db, 'hq-lanes', syd('2026-10-17', '08:16'));
   markOutboxFailed(ctx.db, unsent(ctx.db, false, undefined), 'invented send failure');
 
@@ -109,14 +109,14 @@ test('it sees a failed morning message queued while the owner session is forward
 test('it lists the send status of a morning message forwarded after it was queued', () => {
   const ctx = setupTest();
   morningTick(ctx.db, 'hq-lanes', syd('2026-10-17', '08:16'));
-  setForward(ctx.db, 'z-stu', 'z-other');
+  setForward(ctx.db, 'stu', 'z-other');
 
   expect(recentRuns(ctx.db).map((run) => [run.key, run.sent])).toStrictEqual([['2026-10-17', 'pending']]);
 });
 
 test('it links a morning run queued under a forward to its event alone', () => {
   const ctx = setupTest();
-  setForward(ctx.db, 'z-stu', 'z-other');
+  setForward(ctx.db, 'stu', 'z-other');
   morningTick(ctx.db, 'hq-lanes', syd('2026-10-17', '08:16'));
   const queuedRow = ctx.db.query('SELECT event_seq FROM outbox').get();
 
@@ -125,9 +125,9 @@ test('it links a morning run queued under a forward to its event alone', () => {
 
 test('it reads the send status of a morning run whose key also names the target', () => {
   const ctx = setupTest();
-  setForward(ctx.db, 'z-stu', 'z-other');
-  const item = ctx.seed.outboxItem({ target: 'z-stu' });
-  ctx.seed.morningRunKeyedToTarget({ key: '2026-10-17', outbox_key: `hq-ev${item.event_seq}-z-stu` });
+  setForward(ctx.db, 'stu', 'z-other');
+  const item = ctx.seed.outboxItem({ target: 'stu' });
+  ctx.seed.morningRunKeyedToTarget({ key: '2026-10-17', outbox_key: `hq-ev${item.event_seq}-stu` });
   markOutboxFailed(ctx.db, unsent(ctx.db, false, undefined), 'invented send failure');
 
   expect(recentRuns(ctx.db).map((run) => [run.key, run.sent])).toStrictEqual([['2026-10-17', 'failed']]);

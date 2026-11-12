@@ -11,7 +11,7 @@ Each session loads its role's skill plus the shared skills it needs; `fleet.json
 | [fix-it-here](fix-it-here/SKILL.md)         | shared: when a finding may stay unfixed, which answers hold, fixing well          |
 | [owner-calls](owner-calls/SKILL.md)         | shared: what only the owner decides, how to put it to him, his answers as records |
 | [evidence](evidence/SKILL.md)               | shared: what proves Acceptance before the merge and once live, done by type       |
-| [intake](intake/SKILL.md)                   | `z-stu`: the owner's questions, bugs and requests, focus, calls, reports          |
+| [intake](intake/SKILL.md)                   | `stu`: the owner's questions, bugs and requests, focus, calls, reports            |
 | [linear-triage](linear-triage/SKILL.md)     | `z-triage`: passes, flags, closing, overlap, and the check that builds calls      |
 | [delivery-lead](delivery-lead/SKILL.md)     | `z-delivery`: filling slots, launching, briefing, watching and answering agents   |
 | [pr-review](pr-review/SKILL.md)             | `z-review`: reviewing and merging every PR, and filing follow-ups                 |

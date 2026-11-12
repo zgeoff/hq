@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { readChangingFile } from '../../test/read-changing-file.ts';
 import { buildNodeStateFiles } from './build-node-state-files.ts';
 import { runStateTrim } from './run-state-trim.ts';
+import { roleName } from '../roles/role-name.ts';
+import { toStateRole } from './to-state-role.ts';
 
 function setupTest() {
   const directory = mkdtempSync(join(tmpdir(), 'hq-state-trim-'));
@@ -397,6 +399,27 @@ test('#runStateTrim a refused file gets no backup', () => {
     }),
   ).toThrow();
   expect(readdirSync(ctx.directory)).toStrictEqual(['kettle.md']);
+});
+
+test("#runStateTrim the owner's declared session trims its own state file, whatever its prefix", () => {
+  const ctx = setupTest();
+  const role = toStateRole(roleName('owner'));
+  writeFileSync(
+    join(ctx.directory, `${role}.md`),
+    `## Log\n${Array.from({ length: 40 }, (_unused, index) => `09:${String(index).padStart(2, '0')}Z boiled the water ${'x'.repeat(500)}\n  and then waited\n`).join('')}`,
+  );
+
+  const report = runStateTrim({
+    directory: ctx.directory,
+    roles: ['kettle', role],
+    role,
+    actor: roleName('owner'),
+    dryRun: false,
+    at: new Date('2026-10-31T01:02:03Z'),
+    files: buildNodeStateFiles(),
+  });
+
+  expect(report.written).toBe(true);
 });
 
 test('#runStateTrim a role outside the fleet is refused', () => {

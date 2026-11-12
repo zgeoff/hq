@@ -20,7 +20,7 @@ function setupTest() {
   return { db: fresh.db, look, lookAt };
 }
 
-test('it sends nothing to z-stu at 29 minutes, one message at 30, and none later in the same cause episode', async () => {
+test('it sends nothing to stu at 29 minutes, one message at 30, and none later in the same cause episode', async () => {
   const ctx = setupTest();
   await ctx.lookAt('2026-10-14T01:00:00Z', 0);
   await ctx.lookAt('2026-10-14T01:29:00Z', 0);
@@ -30,7 +30,7 @@ test('it sends nothing to z-stu at 29 minutes, one message at 30, and none later
   await ctx.lookAt('2026-10-14T01:40:00Z', 0);
 
   expect(at29).toStrictEqual([]);
-  expect(at30).toStrictEqual([{ target: 'z-stu', text: 'Lanes: 3 slots empty for 30 min with Backlog issues to promote (triage).' }]);
+  expect(at30).toStrictEqual([{ target: 'stu', text: 'Lanes: 3 slots empty for 30 min with Backlog issues to promote (triage).' }]);
   expect(ctx.look.stalled()).toStrictEqual(at30);
 });
 
@@ -43,7 +43,7 @@ test('it names when the low-water message reached z-triage, and leaves it out wh
   }
   await ctx.lookAt('2026-10-14T01:30:00Z', 0);
 
-  expect(ctx.look.stalled()).toStrictEqual([{ target: 'z-stu', text: 'Lanes: 3 slots empty for 30 min with Backlog issues to promote (triage). z-triage got the low-water message at 12:07.' }]);
+  expect(ctx.look.stalled()).toStrictEqual([{ target: 'stu', text: 'Lanes: 3 slots empty for 30 min with Backlog issues to promote (triage). z-triage got the low-water message at 12:07.' }]);
 });
 
 test('it sends again for a new triage cause episode', async () => {

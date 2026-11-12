@@ -54,7 +54,7 @@ async function setupTest() {
   };
 }
 
-test('it reports a non-fleet pin idle 25 hours to z-stu once per idle stretch, not on the next sweep', async () => {
+test('it reports a non-fleet pin idle 25 hours to stu once per idle stretch, not on the next sweep', async () => {
   const ctx = await setupTest();
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
   ctx.seed.atcSession({ id: '0000f004-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'long-chat', alive: true, state: 'done', pinned: true }, '2026-11-06T02:00:00Z');
@@ -66,7 +66,7 @@ test('it reports a non-fleet pin idle 25 hours to z-stu once per idle stretch, n
     {
       id: expect.any(Number),
       event_seq: expect.any(Number),
-      target: 'z-stu',
+      target: 'stu',
       text: 'long-chat (0000f004) is pinned and has been idle for 25h00m. It is not part of the fleet; decide whether it still needs its pin.',
       idem_key: expect.any(String),
       status: 'pending',
@@ -92,7 +92,7 @@ test('it names the run of a pinned session a run recorded', async () => {
     {
       id: expect.any(Number),
       event_seq: expect.any(Number),
-      target: 'z-stu',
+      target: 'stu',
       text: 'run-chat (0000f007) is pinned and has been idle for 25h00m, on run GEO-607. It is not part of the fleet; decide whether it still needs its pin.',
       idem_key: expect.any(String),
       status: 'pending',

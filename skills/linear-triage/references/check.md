@@ -1,7 +1,7 @@
 # The check
 
 The check turns each decision the owner must make into a call in hq: one question with options and
-your recommendation, which `z-stu` puts to the owner. You never message the owner, and you never
+your recommendation, which `stu` puts to the owner. You never message the owner, and you never
 apply the owner's answer.
 
 Calls come from two places, with no cap:
@@ -50,7 +50,7 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    `{"GEO-9001": {"question": "Split GEO-9001?", "recommendation": "Yes, because 16 PRs landed.", "actions": [], "statusQuo": false, "ownerListed": false}}`.
    For a flag the pass didn't set, look for the owner's answer first. `hq call list --state all`
    gives each call's `issues`, `state`, `answer` and `answered_at`. A call is `applied` once
-   `z-stu` has carried out the answer.
+   `stu` has carried out the answer.
    - When a call in state `answered` or `applied` holds the issue, and every comment after its
      `answered_at` asks the owner nothing new, the owner has answered the flag. Remove
      `Needs Geoff`, add a comment that quotes the answer, and write `{"resolved": true}`. Judge a
@@ -75,7 +75,7 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
    and `--prs` lists them.
 5. **Build the calls:**
    `scripts/build-queue.sh --calls --blocked <file> --notes <file> --untracked <file> <issue pages>`
-   prints each call's kind, question and recommendation as JSON, in `z-stu`'s order. It refuses a
+   prints each call's kind, question and recommendation as JSON, in `stu`'s order. It refuses a
    decision without `ownerListed: true` that has `statusQuo: true`, or whose `actions` are all ones
    owner-calls leaves to the fleet: lines that start `Code delivery`, `Investigation`, `Spike`,
    `Design session` or `Linear:`, and the insert-only Data lines that
@@ -88,7 +88,7 @@ Contents: [State](#state) · [Steps](#steps) · [Calls](#calls) · [Unblock list
      linked work.
 6. **Update hq:** run `hq outbox flush --retry`. Re-add every call in order, including open and
    put-off ones. Close each call in `hq call list` that's no longer gathered, and drop each unblock
-   item whose session says it's done. hq tells `z-stu` itself.
+   item whose session says it's done. hq tells `stu` itself.
    - When `hq call add` prints `reasked`, the owner already answered that call. If every comment
      after the answer asks the owner nothing new, close the call at once with `hq call close`.
      Then remove `Needs Geoff`, and add a comment that quotes the answer. Leave `notes.json` as it

@@ -14,7 +14,7 @@ test('#seedTyped stores a typed message, and input overrides apply', () => {
 
   seedTyped(ctx, { text: 'Hinge it.', source: { kind: 'call', ref: 'teapot-lid', at: null } });
 
-  expect(ctx.readTyped()).toStrictEqual([{ id: 1, to_session: 'z-invented', text: 'Hinge it.', source_kind: 'call', source_ref: 'teapot-lid', typed_by: 'z-stu', at: '2026-10-15T01:00:00Z' }]);
+  expect(ctx.readTyped()).toStrictEqual([{ id: 1, to_session: 'z-invented', text: 'Hinge it.', source_kind: 'call', source_ref: 'teapot-lid', typed_by: 'stu', at: '2026-10-15T01:00:00Z' }]);
 });
 
 test('#seedTyped numbers each message in order', () => {

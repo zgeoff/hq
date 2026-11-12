@@ -23,7 +23,7 @@ test('v28 keeps every typed row and id, and then takes a console source', () => 
   expect(upgraded.query('SELECT * FROM typed ORDER BY id').all()).toStrictEqual(rows);
 
   // An old schema that no current owner can write: this migration test builds it by hand.
-  upgraded.query(`INSERT INTO typed (to_session, text, source_kind, source_ref, typed_by, at) VALUES ('z-invented', 'Descale it.', 'console', 'descale-kettle', 'z-stu', '2026-10-15T01:00:00Z')`).run();
+  upgraded.query(`INSERT INTO typed (to_session, text, source_kind, source_ref, typed_by, at) VALUES ('z-invented', 'Descale it.', 'console', 'descale-kettle', 'stu', '2026-10-15T01:00:00Z')`).run();
   expect(upgraded.query('SELECT id, source_kind FROM typed ORDER BY id').all()).toStrictEqual([
     { id: 1, source_kind: 'call' },
     { id: 3, source_kind: 'chat' },
@@ -74,11 +74,11 @@ function createV27TypedRows(file: string): unknown[] {
   try {
     migrate(v27, file, false, MIGRATIONS.slice(0, 27));
     v27.exec(`INSERT INTO typed (to_session, to_id, to_name, text, source_kind, source_ref, source_at, typed_by, at) VALUES
-      ('z-invented', 'aaaaaaaa-0000-4000-8000-000000000001', 'z-invented', 'Red, please.', 'call', 'kettle-colour', NULL, 'z-stu', '2026-10-15T00:00:00Z'),
-      ('z-invented', NULL, NULL, 'Hinge it.', 'proposal', 'teapot-lid', NULL, 'z-stu', '2026-10-15T00:00:00Z'),
-      ('z-invented', NULL, NULL, 'Ship it.', 'chat', 'bbbbbbbb-0000-4000-8000-000000000002', '2026-10-14T23:59:00Z', 'z-stu', '2026-10-15T00:00:00Z');
+      ('z-invented', 'aaaaaaaa-0000-4000-8000-000000000001', 'z-invented', 'Red, please.', 'call', 'kettle-colour', NULL, 'stu', '2026-10-15T00:00:00Z'),
+      ('z-invented', NULL, NULL, 'Hinge it.', 'proposal', 'teapot-lid', NULL, 'stu', '2026-10-15T00:00:00Z'),
+      ('z-invented', NULL, NULL, 'Ship it.', 'chat', 'bbbbbbbb-0000-4000-8000-000000000002', '2026-10-14T23:59:00Z', 'stu', '2026-10-15T00:00:00Z');
       DELETE FROM typed WHERE id = 2;`);
-    expect(() => v27.exec(`INSERT INTO typed (to_session, text, source_kind, source_ref, typed_by, at) VALUES ('z-invented', 'Too early.', 'console', 'kettle-colour', 'z-stu', '2026-10-15T00:00:00Z')`)).toThrow();
+    expect(() => v27.exec(`INSERT INTO typed (to_session, text, source_kind, source_ref, typed_by, at) VALUES ('z-invented', 'Too early.', 'console', 'kettle-colour', 'stu', '2026-10-15T00:00:00Z')`)).toThrow();
     return v27.query('SELECT * FROM typed ORDER BY id').all();
   } finally {
     v27.close();

@@ -14,6 +14,7 @@ import { strMap } from '../db/str-map.ts';
 import { HqError } from '../errors.ts';
 import { addNews } from '../news/add-news.ts';
 import { enqueue } from '../outbox/enqueue.ts';
+import { forwardOf } from '../outbox/forward-of.ts';
 import { readPrompt } from '../prompts/read-prompt.ts';
 import { cleanEnv } from '../runner/clean-env.ts';
 import { hqSetenv } from '../runner/hq-setenv.ts';
@@ -128,7 +129,10 @@ async function ensureOnce(db: Database, client: FleetClient, opts: EnsureOnceOpt
   const known = metaJson(db, 'fleet_ids', strMap, {});
 
   const unpinned = metaJson(db, FLEET_UNPINNED, strMap, {});
-  const knownIds = (name: string) => [...new Set([known[name], ...wakeList(db).filter((w) => w.name === name).map((w) => w.session_id)].filter((x): x is string => !!x))];
+
+  // A retired name that forwards to a declared one keeps its recorded id, so a rename spawns no second session.
+  const retiredIds = (name: string) => Object.keys(known).filter((recorded) => recorded !== name && forwardOf(db, recorded) === name).map((recorded) => known[recorded]);
+  const knownIds = (name: string) => [...new Set([known[name], ...retiredIds(name), ...wakeList(db).filter((wake) => wake.name === name).map((wake) => wake.session_id)].filter((id): id is string => id !== undefined && id !== ''))];
   // atc writes this record when a restart ends; the restore runs around then.
   let restartAt: number | null = null;
   try {
@@ -155,6 +159,7 @@ async function ensureOnce(db: Database, client: FleetClient, opts: EnsureOnceOpt
     const mine = all.filter((s) => ids.includes(s.id));
     const renamed = mine.find((s) => s.alive);
     if (renamed) {
+      known[e.name] = renamed.id;
       delete missing[e.name];
       steps.push({ name: e.name, action: 'ok', detail: `${renamed.id.slice(0, 8)}, now named ${renamed.name}; hq spawns none`, id: renamed.id });
       continue;

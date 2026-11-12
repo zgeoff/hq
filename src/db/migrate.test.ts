@@ -425,7 +425,7 @@ test('it stores a session name as a linear_filed source after v55', () => {
   db.exec('PRAGMA journal_mode = WAL;');
   migrate(db, path, false, MIGRATIONS.slice(0, 55));
 
-  db.query("INSERT INTO linear_filed (issue, created_at, source, pr_ref, fetched_at) VALUES ('GEO-9802', '2026-10-14T01:00:00Z', 'z-stu', NULL, '2026-10-14T02:00:00Z')").run();
+  db.query("INSERT INTO linear_filed (issue, created_at, source, pr_ref, fetched_at) VALUES ('GEO-9802', '2026-10-14T01:00:00Z', 'stu', NULL, '2026-10-14T02:00:00Z')").run();
 
-  expect(db.query('SELECT source FROM linear_filed').all()).toStrictEqual([{ source: 'z-stu' }]);
+  expect(db.query('SELECT source FROM linear_filed').all()).toStrictEqual([{ source: 'stu' }]);
 });

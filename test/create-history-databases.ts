@@ -48,16 +48,16 @@ export function createHistoryRows(db: Database, repo: string, offset: number): v
   db.query("INSERT OR IGNORE INTO runs (issue, title, place, state, created_at, updated_at) VALUES ('GEO-1', 'An invented run', 'local', 'working', ?, ?)").run(AT, AT);
   db.query("INSERT INTO run_prs (ref, issue, state, fixed_in_pr, added_at, updated_at) VALUES (?, 'GEO-1', 'open', ?, ?, ?)").run(`${repo}#${offset + 5}`, `${repo}#${offset + 6}`, AT, AT);
   db.query("INSERT INTO grant_actions (grant_name, target, actor, at) VALUES ('kettle', ?, 'z-qa', ?)").run(`${repo}#${offset + 7}`, AT);
-  db.query("INSERT INTO marks (at, kind, text, ref, added_by, added_at) VALUES (?, 'hq', ?, ?, 'z-stu', ?)").run(AT, `changed ${repo} and the hq tool`, `https://github.com/zgeoff/${repo}/pull/${offset + 8}`, AT);
-  db.query("INSERT INTO news (from_name, topic, text, link, added_at) VALUES ('z-stu', 'merge', ?, ?, ?)").run(`merged a change to hq itself, ${repo}`, `https://github.com/zgeoff/${repo}/pull/${offset + 9}`, AT);
+  db.query("INSERT INTO marks (at, kind, text, ref, added_by, added_at) VALUES (?, 'hq', ?, ?, 'stu', ?)").run(AT, `changed ${repo} and the hq tool`, `https://github.com/zgeoff/${repo}/pull/${offset + 8}`, AT);
+  db.query("INSERT INTO news (from_name, topic, text, link, added_at) VALUES ('stu', 'merge', ?, ?, ?)").run(`merged a change to hq itself, ${repo}`, `https://github.com/zgeoff/${repo}/pull/${offset + 9}`, AT);
 }
 
 export function createLookalikeRows(db: Database): void {
   db.query('INSERT INTO ci_runs (id, repo, path, event, status, attempt, created_at, updated_at) VALUES (900, ?, ?, ?, ?, ?, ?, ?)').run('hq-tools', 'ci.yml', 'push', 'completed', 1, AT, AT);
   db.query("INSERT INTO grant_actions (grant_name, target, actor, at) VALUES ('kettle', 'hq#abc', 'z-qa', ?)").run(AT);
   db.query("INSERT INTO grant_actions (grant_name, target, actor, at) VALUES ('kettle', 'hq-old#4', 'z-qa', ?)").run(AT);
-  db.query("INSERT INTO marks (at, kind, text, ref, added_by, added_at) VALUES (?, 'hq', 'a lookalike', 'https://github.com/other/hq/pull/5', 'z-stu', ?)").run(AT, AT);
-  db.query("INSERT INTO news (from_name, topic, text, link, added_at) VALUES ('z-stu', 'merge', 'a lookalike', 'https://github.com/zgeoff/hq-tools/pull/6', ?)").run(AT);
+  db.query("INSERT INTO marks (at, kind, text, ref, added_by, added_at) VALUES (?, 'hq', 'a lookalike', 'https://github.com/other/hq/pull/5', 'stu', ?)").run(AT, AT);
+  db.query("INSERT INTO news (from_name, topic, text, link, added_at) VALUES ('stu', 'merge', 'a lookalike', 'https://github.com/zgeoff/hq-tools/pull/6', ?)").run(AT);
   db.query("INSERT INTO events (subject, subject_id, action, actor, at, data) VALUES ('hq', 'hq', 'noted', 'hq', ?, '{\"note\":\"hq\"}')").run(AT);
 }
 

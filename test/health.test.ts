@@ -75,12 +75,12 @@ test('all clear sends nothing', async () => {
   expect(readOutboxRows(db)).toHaveLength(0);
 });
 
-test('a new problem tells z-stu once, in one message per tick; clearing files news', async () => {
+test('it tells stu of a new problem once, in one message per tick; clearing files news', async () => {
   await step(world({ failedUser: ['teapot.service', 'run-r123.service'], availBytes: 2 * 2 ** 30 }), 0);
   expect(readOutboxRows(db)).toHaveLength(1);
   const [message] = readOutboxRows(db);
   assert.ok(message);
-  expect(message.target).toBe('z-stu');
+  expect(message.target).toBe('stu');
   expect(message.text).toContain('2 new problems');
   expect(message.text).toContain('user unit teapot.service has failed');
   expect(message.text).toContain('disk /: 2.0 GiB free');
@@ -112,13 +112,13 @@ test('atc down, pressure high and the watcher inactive are problems', async () =
 
 test('settings change thresholds and refuse nonsense; checks only read', async () => {
   expect(healthSettings(db)).toEqual(HEALTH_DEFAULTS);
-  setHealthSetting(db, 'diskMinGiB', '1', 'z-stu');
-  setHealthSetting(db, 'diskMinPct', '0', 'z-stu');
+  setHealthSetting(db, 'diskMinGiB', '1', 'stu');
+  setHealthSetting(db, 'diskMinPct', '0', 'stu');
   calls.length = 0;
   expect((await step(world({ availBytes: 2 * 2 ** 30 }), 0)).opened).toHaveLength(0);
-  expect(() => setHealthSetting(db, 'nope', '1', 'z-stu')).toThrow('unknown setting');
-  expect(() => setHealthSetting(db, 'restarts', '-1', 'z-stu')).toThrow('0 or more');
-  expect(setHealthSetting(db, 'diskMinGiB', null, 'z-stu').diskMinGiB).toBe(5);
+  expect(() => setHealthSetting(db, 'nope', '1', 'stu')).toThrow('unknown setting');
+  expect(() => setHealthSetting(db, 'restarts', '-1', 'stu')).toThrow('0 or more');
+  expect(setHealthSetting(db, 'diskMinGiB', null, 'stu').diskMinGiB).toBe(5);
   const verbs = new Set(calls.filter((c) => c[0] === 'systemctl').map((c) => c.find((a) => !a.startsWith('-') && a !== 'systemctl')));
   expect([...verbs].sort()).toEqual(['is-active', 'list-units', 'show']);
 });
@@ -135,7 +135,7 @@ test('a failed read neither clears open problems nor drops restart samples', asy
   expect(texts.at(-1)).toContain('kettle.service is restart-looping');
 });
 
-test('it asks the owning session of an oversized state file first, then z-stu once after 2 hours', async () => {
+test('it asks the owning session of an oversized state file first, then stu once after 2 hours', async () => {
   const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit', owner: { session: 'z-kettle', ask: 'trim it' } }];
   const tick = async (minute: number) => {
     at(new Date(Date.parse(NOON_SYDNEY) + minute * 60_000).toISOString());
@@ -151,15 +151,15 @@ test('it asks the owning session of an oversized state file first, then z-stu on
 
   expect(beforeDeadline).toStrictEqual(['z-kettle']);
   expect(readOutboxRows(db).map((row) => ({ target: row.target, text: row.text }))).toStrictEqual([
-    { target: 'z-kettle', text: 'hq health: state file kettle.md is 20.0 KB, over its 16 KB limit. It is yours to fix: trim it. If it still fails in 2 hours, hq tells z-stu as Needs Geoff.' },
+    { target: 'z-kettle', text: 'hq health: state file kettle.md is 20.0 KB, over its 16 KB limit. It is yours to fix: trim it. If it still fails in 2 hours, hq tells stu as Needs Geoff.' },
     {
-      target: 'z-stu',
+      target: 'stu',
       text: 'Needs Geoff (hq health, read-only): 1 problem still open 2 hours after hq asked the owning session to fix it:\n- state file kettle.md is 20.0 KB, over its 16 KB limit (z-kettle was asked at 2026-10-14T01:00:00Z)\nhq health shows every check.',
     },
   ]);
 });
 
-test('it never tells z-stu about an oversized state file fixed inside 2 hours', async () => {
+test('it never tells stu about an oversized state file fixed inside 2 hours', async () => {
   const over = [{ key: 'state-size:kettle.md', ok: false, line: 'state file kettle.md is 20.0 KB, over its 16 KB limit', owner: { session: 'z-kettle', ask: 'trim it' } }];
   const fixed = [{ key: 'state-size', ok: true, line: 'state files: all 1 under their limits' }];
   const tick = async (minute: number, sizes: typeof over | typeof fixed) => {

@@ -19,6 +19,7 @@
     "test",
     "mocks",
     "scripts/grants.ts",
+    "scripts/grants.test.ts",
     "scripts/lint-changed.ts",
     "scripts/lint-changed.test.ts",
     "scripts/check",

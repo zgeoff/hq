@@ -57,7 +57,7 @@ test('it counts a put-off call as waiting when it is due by the tick time though
   const ctx = setupTest();
   onTestFinished(overrideEnv('HQ_NOW', '2026-10-20T19:00:00Z'));
   ctx.addCall('geo-1-paint');
-  laterAsk(ctx.db, 'geo-1-paint', 'call', '2026-10-20T20:30:00Z', 'z-stu');
+  laterAsk(ctx.db, 'geo-1-paint', 'call', '2026-10-20T20:30:00Z', 'stu');
 
   expect(runCallReadyMorningTick(ctx.db, 'hq-lanes', new Date('2026-10-20T21:00:00Z'))).toBe(true);
   expect(ctx.readOutbox()).toStrictEqual([{ target: owner(), text: 'call ready', topic: 'call-ready-morning' }]);
@@ -67,7 +67,7 @@ test('it queues nothing while something is open', () => {
   const ctx = setupTest();
   ctx.addCall('geo-1-paint');
   ctx.addCall('geo-2-roof');
-  openAsk(ctx.db, { force: true, actor: 'z-stu' });
+  openAsk(ctx.db, { force: true, actor: 'stu' });
 
   expect(runCallReadyMorningTick(ctx.db, 'hq-lanes', new Date('2026-10-20T20:00:00Z'))).toBe(false);
   expect(ctx.readOutbox()).toStrictEqual([]);

@@ -5,7 +5,7 @@ works, read [sessions.md](../../../docs/sessions.md).
 
 ## Restarts
 
-- Never restart yourself, `z-stu`. The owner restarts you, as sessions.md says.
+- Never restart yourself, `stu`. The owner restarts you, as sessions.md says.
 - When `z-delivery` is stopped and fails every turn with "unexpected tool_use_id found
   in advisor_tool_result blocks", repair its transcript before you restart it:
   1. Run `hq repair advisor-400 <session name or id>`, and read the dry run.

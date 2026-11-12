@@ -21,7 +21,7 @@ function setupTest() {
 test('the session recorded for the act actor voids it, and the row, an event and a news item say so', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
@@ -38,7 +38,7 @@ test('the session recorded for the act actor voids it, and the row, an event and
 test('a void of an act with a 400-character target keeps the whole reason in the news and shortens the target', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: `bun run descale --kettle ${'k'.repeat(375)}`, note: null, actor: 'teapot-bot' });
 
@@ -50,24 +50,24 @@ test('a void of an act with a 400-character target keeps the whole reason in the
 test('the owner session voids an act another session logged, and the owner name is recorded', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
   const voided = await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-1'), clock: () => new Date('2026-10-14T03:00:00Z') });
 
-  expect(voided.voided_by).toBe('z-stu');
-  expect(ctx.db.query("SELECT actor FROM events WHERE action = 'grant-void'").all()).toStrictEqual([{ actor: 'z-stu' }]);
+  expect(voided.voided_by).toBe('stu');
+  expect(ctx.db.query("SELECT actor FROM events WHERE action = 'grant-void'").all()).toStrictEqual([{ actor: 'stu' }]);
 });
 
 test('another recorded session is refused, naming who may void the act, and nothing changes', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
-  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-3'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({ code: 'not_allowed', message: 'only teapot-bot, who logged grant action 1, or z-stu may void it' });
+  await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-3'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({ code: 'not_allowed', message: 'only teapot-bot, who logged grant action 1, or stu may void it' });
   expect(ctx.db.query('SELECT voided_at FROM grant_actions').all()).toStrictEqual([{ voided_at: null }]);
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM news').get()).toStrictEqual({ total: 0 });
 });
@@ -78,7 +78,7 @@ test.each([
 ])('a caller atc cannot name is refused when %s', async (_case, peerSession) => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
@@ -89,13 +89,13 @@ test.each([
 test('an atc daemon with no socket at its path refuses the void and says why', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
   await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: { openClient: () => AtcClient.open(join(ctx.directory, 'no-atc-daemon.sock'), 1500) }, clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({
     code: 'not_allowed',
-    message: 'only teapot-bot, who logged grant action 1, or z-stu may void it; atc cannot say who is calling (Failed to connect)',
+    message: 'only teapot-bot, who logged grant action 1, or stu may void it; atc cannot say who is calling (Failed to connect)',
   });
   expect(ctx.db.query('SELECT voided_at FROM grant_actions').all()).toStrictEqual([{ voided_at: null }]);
 });
@@ -103,10 +103,10 @@ test('an atc daemon with no socket at its path refuses the void and says why', a
 test('a session with no recorded fleet id is refused even when its name matches the actor', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1' }));
 
   await expect(voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-2'), clock: () => new Date('2026-10-14T03:00:00Z') })).rejects.toMatchObject({ code: 'not_allowed' });
 });
@@ -114,7 +114,7 @@ test('a session with no recorded fleet id is refused even when its name matches 
 test('an unknown act id is refused as not found', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 
@@ -124,7 +124,7 @@ test('an unknown act id is refused as not found', async () => {
 test('a void act has no move to void again, so a second void is refused, naming when, by whom and why it was voided', async () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
   await voidGrantAction({ db: ctx.db, args: { id: 1, reason: 'wrong PR' }, probe: ctx.probeAs('kettle-2'), clock: () => new Date('2026-10-14T03:00:00Z') });
@@ -141,7 +141,7 @@ test('a void act has no move to void again, so a second void is refused, naming 
 test('the voided time comes from the given clock, never from HQ_NOW', async () => {
   const ctx = setupTest();
   at('2099-01-01T00:00:00Z');
-  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'z-stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
+  setMeta(ctx.db, 'fleet_ids', JSON.stringify({ 'stu': 'kettle-1', 'teapot-bot': 'kettle-2', 'kettle-bot': 'kettle-3' }));
   createGrantMark(ctx.db, { text: 'kettle PRs merge on green CI', ref: 'kettle#3', at: null, name: 'kettle-merges', actor: 'kettle-bot' });
   recordGrantAction(ctx.db, { grant: 'kettle-merges', target: 'kettle#9', note: null, actor: 'teapot-bot' });
 

@@ -273,7 +273,7 @@ test('it holds the supply alert for the owner through quiet hours and sends it a
   tick(ctx.db, sample, 'hq-lanes');
 
   expect(quiet).toStrictEqual([]);
-  expect(ctx.queued()).toStrictEqual([{ target: 'z-stu', text: 'Lanes: 180 slot-minutes empty today with no Ready work and no Backlog issue to promote (supply). Free slots: 3.' }]);
+  expect(ctx.queued()).toStrictEqual([{ target: 'stu', text: 'Lanes: 180 slot-minutes empty today with no Ready work and no Backlog issue to promote (supply). Free slots: 3.' }]);
 });
 
 test('it sends the owner the held supply alert at the first look after quiet hours even when the cause has become triage', async () => {
@@ -296,7 +296,7 @@ test('it sends the owner the held supply alert at the first look after quiet hou
   expect(quiet).toStrictEqual([]);
   expect(ctx.queued()).toStrictEqual([
     { target: 'z-triage', text: 'Lanes: 90 slot-minutes empty today with no Ready work and Backlog issues waiting to be promoted (triage). Free slots: 3.' },
-    { target: 'z-stu', text: 'Lanes: 90 slot-minutes empty today with no Ready work and no Backlog issue to promote (supply). Free slots: 3.' },
+    { target: 'stu', text: 'Lanes: 90 slot-minutes empty today with no Ready work and no Backlog issue to promote (supply). Free slots: 3.' },
   ]);
 });
 
@@ -319,7 +319,7 @@ test('it counts no slot-minutes while the cap, not the pool, holds the free slot
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'freeze', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'freeze', by: 'stu', at: '2026-10-14T00:00:00Z' }));
   await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:20:00Z');
@@ -336,7 +336,7 @@ test('it counts no slot-minutes while a lanes hold is in force', async () => {
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
-  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'stu');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:20:00Z');
 
@@ -352,7 +352,7 @@ test('it counts only the minutes after a hold ends in the first look after it', 
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
-  holdLanes(ctx.db, 20, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 20, 'the kettle supplier is closed', 'stu');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:25:00Z');
 
@@ -366,10 +366,10 @@ test('it counts only the minutes after a release in the first look after it', as
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
   await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
-  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'stu');
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:10:00Z');
-  releaseLanes(ctx.db, 'z-stu');
+  releaseLanes(ctx.db, 'stu');
   at('2026-10-14T01:15:00Z');
 
   tick(ctx.db, sample, 'hq-lanes');
@@ -387,7 +387,7 @@ test('it counts none of a hold that starts and ends between two looks', async ()
   tick(ctx.db, sample, 'hq-lanes');
   const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
   at('2026-10-14T01:16:00Z');
-  holdLanes(ctx.db, 2, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 2, 'the kettle supplier is closed', 'stu');
   at('2026-10-14T01:20:00Z');
 
   tick(ctx.db, sample, 'hq-lanes');
@@ -405,9 +405,9 @@ test('it counts none of two holds that each start and end between the same two l
   tick(ctx.db, sample, 'hq-lanes');
   const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
   at('2026-10-14T01:12:00Z');
-  holdLanes(ctx.db, 1, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 1, 'the kettle supplier is closed', 'stu');
   at('2026-10-14T01:15:00Z');
-  holdLanes(ctx.db, 2, 'the kettle supplier is closed again', 'z-stu');
+  holdLanes(ctx.db, 2, 'the kettle supplier is closed again', 'stu');
   at('2026-10-14T01:20:00Z');
 
   tick(ctx.db, sample, 'hq-lanes');
@@ -424,7 +424,7 @@ test('it counts none of a hold an older build saved, from its start to its end',
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
-  holdLanes(ctx.db, 6, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 6, 'the kettle supplier is closed', 'stu');
   setMeta(ctx.db, LANES_HELD_SPANS, null);
   at('2026-10-14T01:20:00Z');
 
@@ -442,10 +442,10 @@ test('it counts none of a hold an older build saved, from its start to its relea
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
-  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'stu');
   setMeta(ctx.db, LANES_HELD_SPANS, null);
   at('2026-10-14T01:14:00Z');
-  releaseLanes(ctx.db, 'z-stu');
+  releaseLanes(ctx.db, 'stu');
   at('2026-10-14T01:20:00Z');
 
   tick(ctx.db, sample, 'hq-lanes');
@@ -462,10 +462,10 @@ test('it counts none of a hold an older build saved, when a release clears it af
   at('2026-10-14T01:11:00Z');
   tick(ctx.db, sample, 'hq-lanes');
   const before = readSlotMinutes(ctx.db, '2026-10-14').delivery;
-  holdLanes(ctx.db, 6, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 6, 'the kettle supplier is closed', 'stu');
   setMeta(ctx.db, LANES_HELD_SPANS, null);
   at('2026-10-14T01:18:00Z');
-  releaseLanes(ctx.db, 'z-stu');
+  releaseLanes(ctx.db, 'stu');
   at('2026-10-14T01:20:00Z');
 
   tick(ctx.db, sample, 'hq-lanes');
@@ -487,7 +487,7 @@ test('it offers no slot when pacing has no lanes and a cap of zero holds the imp
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   createCapacitySample(ctx.db, { at: '2026-10-14T00:55:00Z', nonnixAwakeMib: 0 });
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: null, reason: 'kettle descaling', by: 'stu', at: '2026-10-14T00:00:00Z' }));
 
   const result = tick(ctx.db, { cap: { imp: { freeMib: 4096 }, providers: { kettle: { room: true, unattended: true, target: 'imp' } } }, impMib: 2048, error: null }, 'hq-lanes');
 
@@ -499,7 +499,7 @@ test('it counts slot-minutes for the free slots the cap leaves', async () => {
   const ctx = setupTest();
   at('2026-10-14T01:00:00Z');
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: null, reason: null, by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: null, reason: null, by: 'stu', at: '2026-10-14T00:00:00Z' }));
   await ctx.seed.readyIssues([{ identifier: 'GEO-9801', project: 'kettle roadmap', type: 'Feature', labels: ['atc'], priority: 1 }]);
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:05:00Z');
@@ -518,7 +518,7 @@ test('it ends a cap whose time has passed once, with news and a message to the d
   at('2026-10-14T01:00:00Z');
   setSystemTime(new Date('2026-10-14T01:00:00Z'));
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T01:30:00Z', reason: 'quota', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T01:30:00Z', reason: 'quota', by: 'stu', at: '2026-10-14T00:00:00Z' }));
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:31:00Z');
   setSystemTime(new Date('2026-10-14T01:31:00Z'));
@@ -540,7 +540,7 @@ test('it keeps a cap whose time has not passed', () => {
   at('2026-10-14T01:00:00Z');
   setSystemTime(new Date('2026-10-14T01:00:00Z'));
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T01:30:00Z', reason: 'quota', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 2, until: '2026-10-14T01:30:00Z', reason: 'quota', by: 'stu', at: '2026-10-14T00:00:00Z' }));
 
   tick(ctx.db, sample, 'hq-lanes');
 
@@ -553,7 +553,7 @@ test('it holds the slot plan to a cap the wall clock has not reached while HQ_NO
   onTestFinished(() => setSystemTime());
   at('2099-01-01T00:00:00Z');
   setSystemTime(new Date('2026-10-14T01:00:00Z'));
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'stu', at: '2026-10-14T00:00:00Z' }));
 
   const result = tick(ctx.db, { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } }, 'hq-lanes');
 
@@ -567,7 +567,7 @@ test('it holds the imp pool to a cap the wall clock has not reached while HQ_NOW
   at('2099-01-01T00:00:00Z');
   setSystemTime(new Date('2026-10-14T01:00:00Z'));
   createCapacitySample(ctx.db, { at: '2098-12-31T23:55:00Z', nonnixAwakeMib: 0 });
-  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' }));
+  setMeta(ctx.db, 'lanes_cap', JSON.stringify({ cap: 0, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'stu', at: '2026-10-14T00:00:00Z' }));
 
   const result = tick(ctx.db, { cap: { imp: { freeMib: 4096 }, providers: { kettle: { room: true, unattended: true, target: 'imp' } } }, impMib: 2048, error: null }, 'hq-lanes');
 
@@ -581,7 +581,7 @@ test('it keeps a cap the wall clock has not reached while HQ_NOW pins a later ti
   at('2099-01-01T00:00:00Z');
   setSystemTime(new Date('2026-10-14T01:00:00Z'));
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 } };
-  const stored = JSON.stringify({ cap: 7, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'z-stu', at: '2026-10-14T00:00:00Z' });
+  const stored = JSON.stringify({ cap: 7, until: '2026-10-14T02:00:00Z', reason: 'kettle descaling', by: 'stu', at: '2026-10-14T00:00:00Z' });
   setMeta(ctx.db, 'lanes_cap', stored);
 
   tick(ctx.db, sample, 'hq-lanes');
@@ -627,7 +627,7 @@ test('it counts no design minutes while a lanes hold is in force, though a needs
   const ctx = setupTest();
   const sample = { cap: { imp: { freeMib: 0, room: true } }, impMib: 2048, error: null, slots: { imp: 0, local: 3 }, design: { agent: 2, withGeoff: 1 } };
   at('2026-10-14T01:00:00Z');
-  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'z-stu');
+  holdLanes(ctx.db, 120, 'the kettle supplier is closed', 'stu');
   writeDesignBacklog(ctx.db, { at: new Date('2026-10-14T01:00:00Z'), agent: [buildReadyIssue('GEO-9901', { project: 'kettle roadmap', labels: ['needs-design'], type: 'Design', priority: 2 })], withGeoff: [] });
   tick(ctx.db, sample, 'hq-lanes');
   at('2026-10-14T01:08:00Z');

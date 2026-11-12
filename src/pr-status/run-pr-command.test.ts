@@ -25,18 +25,18 @@ function setupTest() {
     seed: buildSeeder(fresh),
     fileCall: (id: string, title: string) => {
       addAsk(fresh.db, { kind: 'call', id, title, question: 'Boil?', body: 'Body', issues: [], forSession: null, actor: 'z-kettle' });
-      openAsk(fresh.db, { id, force: true, actor: 'z-stu' });
+      openAsk(fresh.db, { id, force: true, actor: 'stu' });
     },
     refileCall: (id: string, title: string) => {
       addAsk(fresh.db, { kind: 'call', id, title, question: 'Boil again?', body: 'Body', issues: [], forSession: null, actor: 'z-kettle' });
-      openAsk(fresh.db, { id, force: true, actor: 'z-stu' });
+      openAsk(fresh.db, { id, force: true, actor: 'stu' });
     },
     fileGrantCall: (id: string, grants: Record<string, string>) => {
       applyAskItem(fresh.db, { kind: 'call', id, issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Merge widgets#7?', question: 'Merge past the red check?', options: [{ label: 'Go', effect: 'Merge it.', grants }, { label: 'Wait', effect: 'Fix it first.' }] })), 'Merge past the red check?');
       recordConsoleAnswer(fresh.db, { id, option: 'Go', note: '', actor: 'owner' });
     },
-    answerInHq: (id: string) => answerAsk(fresh.db, { id, kind: 'call', answer: 'Yes', actor: 'z-stu' }),
-    answerByHqCall: async (id: string, verdict: 'owner' | 'other', actor = 'z-stu') => await runCallAnswer(fresh.db, { id, kind: 'call', answer: 'Yes', actor }, () => Promise.resolve({ verdict })),
+    answerInHq: (id: string) => answerAsk(fresh.db, { id, kind: 'call', answer: 'Yes', actor: 'stu' }),
+    answerByHqCall: async (id: string, verdict: 'owner' | 'other', actor = 'stu') => await runCallAnswer(fresh.db, { id, kind: 'call', answer: 'Yes', actor }, () => Promise.resolve({ verdict })),
     answerInConsole: (id: string) => recordConsoleAnswer(fresh.db, { id, option: '', note: 'Yes', actor: 'owner' }),
     headAt: (head: string) => buildFakeRunner({ prHead: { code: 0, stdout: JSON.stringify({ headRefOid: head }), stderr: '' }, reviewComments: buildCommentLines(buildBotComment(501, 'Kettle never boils', ['aaaaaaaaaaaaaaaa'])) }),
     ghDown: () => buildFakeRunner({ prHead: { code: 1, stdout: '', stderr: 'gh: could not resolve to a PullRequest' } }),
@@ -250,7 +250,7 @@ test('it logs an event for an answer', async () => {
 test('it sets who holds the next step, and shows the record against the head gh gives now', async () => {
   const ctx = setupTest();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).resolves.toStrictEqual({
     data: {
       pr: {
         repo: 'widgets',
@@ -266,7 +266,7 @@ test('it sets who holds the next step, and shows the record against the head gh 
         answerSource: null,
         answerNote: null,
         answerAt: null,
-        next: 'z-stu',
+        next: 'stu',
         nextAt: '2026-10-14T01:00:00Z',
         override: null,
         ciOverrides: [],
@@ -275,28 +275,28 @@ test('it sets who holds the next step, and shows the record against the head gh 
         updatedAt: '2026-10-14T01:00:00Z',
       },
     },
-    text: ['widgets#7  head a1b2c3d', 'gate: not recorded', 'answer: none', 'next: z-stu (2026-10-14T01:00:00Z)'].join('\n'),
+    text: ['widgets#7  head a1b2c3d', 'gate: not recorded', 'answer: none', 'next: stu (2026-10-14T01:00:00Z)'].join('\n'),
   });
 });
 
 test('it logs an event for a next step', async () => {
   const ctx = setupTest();
 
-  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   expect(ctx.db.query("SELECT action FROM events WHERE subject_id = 'pr:widgets#7'").all()).toStrictEqual([{ action: 'pr-next' }]);
 });
 
 test('it says the head was never seen and could not be read when gh is down for a next step on a PR with no record', async () => {
   const ctx = setupTest();
-  const shown = await runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  const shown = await runPRCommand({ run: ctx.ghDown().run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
-  expect(shown.text).toBe(['widgets#7  head never seen', 'gate: not recorded', 'answer: none', 'next: z-stu (2026-10-14T01:00:00Z)', 'The PR head could not be read, so stale is unknown.'].join('\n'));
+  expect(shown.text).toBe(['widgets#7  head never seen', 'gate: not recorded', 'answer: none', 'next: stu (2026-10-14T01:00:00Z)', 'The PR head could not be read, so stale is unknown.'].join('\n'));
 });
 
 test('it clears who holds the next step', async () => {
   const ctx = setupTest();
-  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
+  await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'stu'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
   await runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7'], flags: { clear: true }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) });
 
@@ -306,7 +306,7 @@ test('it clears who holds the next step', async () => {
 test('it refuses a next step held by a session that is not declared, naming the declared ones', async () => {
   const ctx = setupTest();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-nobody'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('z-stu') });
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-nobody'], flags: {}, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({ code: 'bad_args', message: expect.stringContaining('stu') });
 
   expect(ctx.db.query('SELECT COUNT(*) AS n FROM pr_status').get()).toStrictEqual({ n: 0 });
 });
@@ -325,7 +325,7 @@ test('it refuses a next step with neither a session nor --clear, with the usage'
 test('it refuses a next step that gives both a session and --clear', async () => {
   const ctx = setupTest();
 
-  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'z-stu'], flags: { clear: true }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({
+  await expect(runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'next', rest: ['widgets', '7', 'stu'], flags: { clear: true }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'other' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) })).rejects.toMatchObject({
     code: 'bad_args',
     message: 'give a session or --clear, not both; usage: hq pr next <repo> <pr> <session> | --clear',
   });
@@ -547,7 +547,7 @@ test('it shows a standing override and the reviewer as next, in text and in JSON
 test.each(['override', 'accept-risk'])('it refuses a chat: source for %s from a caller that is not the owner session, and records nothing', async (verb) => {
   const ctx = setupTest();
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'chat:kettle-12', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: a chat: source is accepted only from the session of the owner (z-stu), as atc finds the caller; this caller is not it; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'chat:kettle-12', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: a chat: source is accepted only from the session of the owner (stu), as atc finds the caller; this caller is not it; ask stu to record it' });
 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 0 });
 });
@@ -557,7 +557,7 @@ test('it refuses a chat: source with the cause when atc cannot say whether the c
 
   await expect(
     runPRCommand({ run: ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678').run, db: ctx.db, verb: 'override', rest: ['widgets', '7'], flags: { source: 'chat:kettle-12', note: 'Ship it.' }, actor: ctx.actor, readOwnerSession: () => Promise.resolve({ verdict: 'unknown', cause: 'connect ENOENT /run/teapot.sock' }), readReviewerSession: () => Promise.resolve({ verdict: 'match' }) }),
-  ).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: a chat: source is accepted only from the session of the owner (z-stu), and atc could not say whether this caller is it: connect ENOENT /run/teapot.sock; ask z-stu to record it' });
+  ).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: a chat: source is accepted only from the session of the owner (stu), and atc could not say whether this caller is it: connect ENOENT /run/teapot.sock; ask stu to record it' });
 });
 
 test.each(['override', 'accept-risk'])('it records a chat: source for %s from the owner session', async (verb) => {
@@ -571,14 +571,14 @@ test.each(['override', 'accept-risk'])('it records a chat: source for %s from th
 test.each(['override', 'accept-risk'])('it refuses a call: source for %s that names no call in hq', async (verb) => {
   const ctx = setupTest();
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'call:KET-9', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-9 is not a call in hq; ask z-stu to record it' });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'call:KET-9', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-9 is not a call in hq; ask stu to record it' });
 });
 
 test('it refuses a call: source for a call the owner has not answered', async () => {
   const ctx = setupTest();
   ctx.fileCall('KET-4', 'Pour widgets#7 now?');
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller; ask z-stu to record it" });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (stu), as atc finds the caller; ask stu to record it" });
 });
 
 test('it refuses a call: source for an hq call answer recorded with no owner-session mark', async () => {
@@ -586,10 +586,10 @@ test('it refuses a call: source for an hq call answer recorded with no owner-ses
   ctx.fileCall('KET-4', 'Pour widgets#7 now?');
   ctx.answerInHq('KET-4');
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller; ask z-stu to record it" });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-4 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (stu), as atc finds the caller; ask stu to record it" });
 });
 
-test('it accepts a call: source for accept-risk from a call answered by hq call answer in the z-stu session', async () => {
+test('it accepts a call: source for accept-risk from a call answered by hq call answer in the stu session', async () => {
   const ctx = setupTest();
   ctx.fileCall('KET-11', 'Accept-risk aaaaaaaaaaaaaaaa on widgets#7?');
   await ctx.answerByHqCall('KET-11', 'owner');
@@ -599,13 +599,13 @@ test('it accepts a call: source for accept-risk from a call answered by hq call 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 1 });
 });
 
-test('it refuses a call: source answered by hq call answer --by z-stu from another session, and records nothing', async () => {
+test('it refuses a call: source answered by hq call answer --by stu from another session, and records nothing', async () => {
   const ctx = setupTest();
   ctx.fileCall('KET-12', 'Pour widgets#7 now?');
   await ctx.answerByHqCall('KET-12', 'other');
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-12', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-12 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller; ask z-stu to record it" });
-  expect(ctx.db.query("SELECT actor FROM events WHERE subject_id = 'KET-12' AND action = 'answered'").all()).toStrictEqual([{ actor: 'z-stu' }]);
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-12', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: "--source refused: call:KET-12 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (stu), as atc finds the caller; ask stu to record it" });
+  expect(ctx.db.query("SELECT actor FROM events WHERE subject_id = 'KET-12' AND action = 'answered'").all()).toStrictEqual([{ actor: 'stu' }]);
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 
@@ -614,7 +614,7 @@ test('it refuses a call: source for the PR a refiled call names until the owner 
   ctx.fileCall('KET-21', 'Pour widgets#7 now?');
   ctx.answerInConsole('KET-21');
   ctx.refileCall('KET-21', 'Pour widgets#8 now?');
-  const refusal = "--source refused: call:KET-21 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller; ask z-stu to record it";
+  const refusal = "--source refused: call:KET-21 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (stu), as atc finds the caller; ask stu to record it";
 
   await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '8'], { source: 'call:KET-21', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: refusal });
   await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-21', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: refusal });
@@ -625,7 +625,7 @@ test('it refuses a call: source for the PR a refiled call names until the owner 
 
 test.each([
   ['the console', (ctx: ReturnType<typeof setupTest>) => Promise.resolve(ctx.answerInConsole('KET-22'))],
-  ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByHqCall('KET-22', 'owner')],
+  ['hq call answer in the stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByHqCall('KET-22', 'owner')],
 ])('it accepts a call: source for the PR a refiled call names once the owner answers the new round in %s', async (_case, answerNewRound) => {
   const ctx = setupTest();
   ctx.fileCall('KET-22', 'Accept-risk aaaaaaaaaaaaaaaa on widgets#7?');
@@ -649,7 +649,7 @@ test.each([
   ctx.fileCall('KET-4', title);
   ctx.answerInConsole('KET-4');
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-4 does not name zgeoff/widgets#7 in the title the owner answered; ask z-stu to record it' });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'call:KET-4', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-4 does not name zgeoff/widgets#7 in the title the owner answered; ask stu to record it' });
 });
 
 test.each(['Accept-risk aaaaaaaaaaaaaaaa on zgeoff/widgets#7?', 'Widgets#7: accept-risk aaaaaaaaaaaaaaaa?'])('it accepts a call: source for accept-risk from a console-answered call titled %s', async (title) => {
@@ -664,13 +664,13 @@ test.each(['Accept-risk aaaaaaaaaaaaaaaa on zgeoff/widgets#7?', 'Widgets#7: acce
 
 test.each([
   ['the console', (ctx: ReturnType<typeof setupTest>) => Promise.resolve(ctx.answerInConsole('KET-5'))],
-  ['hq call answer in the z-stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByHqCall('KET-5', 'owner')],
+  ['hq call answer in the stu session', async (ctx: ReturnType<typeof setupTest>) => await ctx.answerByHqCall('KET-5', 'owner')],
 ])('it refuses a call: source for override from a plain Yes in %s, even to a call that names an override of the PR', async (_case, answer) => {
   const ctx = setupTest();
   ctx.fileCall('KET-5', 'Override widgets#7 preview check?');
   await answer(ctx);
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-5', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-5 has no option that grants the override: an override needs the owner to pick an option whose grants name the PR; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-5', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-5 has no option that grants the override: an override needs the owner to pick an option whose grants name the PR; ask stu to record it' });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 
@@ -683,7 +683,7 @@ test.each([
   ctx.fileCall('KET-34', row.title);
   ctx.answerInConsole('KET-34');
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), row.verb, [...row.rest], { source: 'call:KET-34', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: call:KET-34 does not name ${row.why} in the title the owner answered; ask z-stu to record it` });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), row.verb, [...row.rest], { source: 'call:KET-34', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: call:KET-34 does not name ${row.why} in the title the owner answered; ask stu to record it` });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 0 });
 });
 
@@ -692,16 +692,16 @@ test.each(['No', 'No | Not this head.', 'Yes, but not yet', 'Later'])('it refuse
   ctx.fileCall('KET-31', 'Accept-risk aaaaaaaaaaaaaaaa on widgets#7?');
   recordConsoleAnswer(ctx.db, { id: 'KET-31', option: '', note, actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'call:KET-31', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the owner's answer to call:KET-31 is not a yes: "${note}"; ask z-stu to record it` });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'call:KET-31', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the owner's answer to call:KET-31 is not a yes: "${note}"; ask stu to record it` });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-accepted-risk'").get()).toStrictEqual({ total: 0 });
 });
 
-test('it refuses a call: source for a call the owner answered No by hq call answer in the z-stu session', async () => {
+test('it refuses a call: source for a call the owner answered No by hq call answer in the stu session', async () => {
   const ctx = setupTest();
   ctx.fileCall('KET-32', 'Accept-risk aaaaaaaaaaaaaaaa on widgets#7?');
-  answerAsk(ctx.db, { id: 'KET-32', kind: 'call', answer: 'No', actor: 'z-stu', ownerSession: true });
+  answerAsk(ctx.db, { id: 'KET-32', kind: 'call', answer: 'No', actor: 'stu', ownerSession: true });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'call:KET-32', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the owner's answer to call:KET-32 is not a yes: "No"; ask z-stu to record it` });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'accept-risk', ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'call:KET-32', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the owner's answer to call:KET-32 is not a yes: "No"; ask stu to record it` });
 });
 
 test.each(['yes', 'Yes.', 'Yes | Descale it first.'])('it accepts a call: source for a call the owner answered %p in the console', async (note) => {
@@ -717,7 +717,7 @@ test.each(['yes', 'Yes.', 'Yes | Descale it first.'])('it accepts a call: source
 test.each(['override', 'accept-risk'])('it refuses a console: source for %s that names no call', async (verb) => {
   const ctx = setupTest();
 
-  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'console:KET-6', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:KET-6 is not a call in hq; ask z-stu to record it' });
+  await expect(ctx.asOwner(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), verb, ['widgets', '7', 'aaaaaaaaaaaaaaaa'], { source: 'console:KET-6', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:KET-6 is not a call in hq; ask stu to record it' });
 });
 
 test('it refuses a console: source whose only event is a mark, not an answer', async () => {
@@ -731,7 +731,7 @@ test('it refuses a console: source that is a review answer, for an override', as
   const ctx = setupTest();
   logEvent(ctx.db, 'unblock', 'review-8', 'console-review', 'owner', null, null, { review: 'lgtm', note: null });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:review-8', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:review-8 is not a call in hq; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:review-8', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: console:review-8 is not a call in hq; ask stu to record it' });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 
@@ -740,7 +740,7 @@ test('it refuses a console: source for a call whose options grant nothing, even 
   applyAskItem(ctx.db, { kind: 'call', id: 'KET-41', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override widgets#7?', question: 'Override widgets#7?', options: [{ label: 'Yes', effect: 'Merge it.' }, { label: 'No', effect: 'Wait.' }] })), 'Override widgets#7?');
   recordConsoleAnswer(ctx.db, { id: 'KET-41', option: 'Yes', note: '', actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-41', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in console:KET-41 ("Yes") grants no override; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'console:KET-41', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in console:KET-41 ("Yes") grants no override; ask stu to record it' });
 });
 
 test.each([
@@ -753,7 +753,7 @@ test.each([
   applyAskItem(ctx.db, { kind: 'call', id: 'KET-40', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override?', question: 'Merge past the findings?', options: [{ label: 'Override', effect: 'Merge it.', grants: row.grants }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
   recordConsoleAnswer(ctx.db, { id: 'KET-40', option: 'Override', note: '', actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), row.verb, [...row.rest], { source: 'console:KET-40', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the option the owner picked in console:KET-40 grants ${row.why}; ask z-stu to record it` });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), row.verb, [...row.rest], { source: 'console:KET-40', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: the option the owner picked in console:KET-40 grants ${row.why}; ask stu to record it` });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action IN ('pr-override', 'pr-accepted-risk')").get()).toStrictEqual({ total: 0 });
 });
 
@@ -762,7 +762,7 @@ test('it refuses a source whose owner picked the option that grants nothing', as
   applyAskItem(ctx.db, { kind: 'call', id: 'KET-43', issues: [], forSession: null, actor: 'z-kettle' }, parseItemInput('call', JSON.stringify({ title: 'Override?', question: 'Merge past the findings?', options: [{ label: 'Override', effect: 'Merge it.', grants: { action: 'override', pr: 'zgeoff/widgets#7' } }, { label: 'Wait', effect: 'Fix them first.' }] })), 'Merge past the findings?');
   recordConsoleAnswer(ctx.db, { id: 'KET-43', option: 'Wait', note: 'Fix the spout first.', actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-43', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in call:KET-43 ("Wait") grants no override; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-43', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the option the owner picked in call:KET-43 ("Wait") grants no override; ask stu to record it' });
 });
 
 test.each(['console:KET-42', 'call:KET-42'])('it records an accepted risk from %s when the picked option grants it, whatever its label', async (source) => {
@@ -805,7 +805,7 @@ test('it refuses a call: source whose answer picks a grant label the call showed
   ctx.refileCall('KET-47', 'Override widgets#7?');
   recordConsoleAnswer(ctx.db, { id: 'KET-47', option: '', note: 'Go', actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-47 has no option that grants the override: an override needs the owner to pick an option whose grants name the PR; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source: 'call:KET-47', note: 'Ship it.' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: call:KET-47 has no option that grants the override: an override needs the owner to pick an option whose grants name the PR; ask stu to record it' });
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });
 
@@ -823,7 +823,7 @@ test('it refuses an owner answer with a chat: source from a session that is not 
 
   await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'chat:kettle-12' })).rejects.toMatchObject({
     code: 'bad_args',
-    message: '--source refused: a chat: source is accepted only from the session of the owner (z-stu), as atc finds the caller; this caller is not it; ask z-stu to record it',
+    message: '--source refused: a chat: source is accepted only from the session of the owner (stu), as atc finds the caller; this caller is not it; ask stu to record it',
   });
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
 });
@@ -853,7 +853,7 @@ test.each([
     logEvent(ctx.db, 'hq', 'pr:widgets#7', 'pr-answer', 'console', null, null, { answer: 'lgtm', head: row.stored, source: 'console:review-9', note: null });
   }
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'console:review-9' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${row.why}; ask z-stu to record it` });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'console:review-9' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${row.why}; ask stu to record it` });
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
 });
 
@@ -877,7 +877,7 @@ test('it takes a call: source the owner answered with a plain Yes on a call that
 
 test.each([
   { case: 'that names another PR', title: 'lgtm teapots#7?', answer: true, why: 'call:KET-51 does not name zgeoff/widgets#7 in the title the owner answered' },
-  { case: 'that the owner has not answered', title: 'lgtm widgets#7?', answer: false, why: "call:KET-51 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (z-stu), as atc finds the caller" },
+  { case: 'that the owner has not answered', title: 'lgtm widgets#7?', answer: false, why: "call:KET-51 has no owner answer for its current round, in the console or by `hq call answer` from the owner's session (stu), as atc finds the caller" },
 ])('it refuses a call: source $case, and stores nothing', async (row) => {
   const ctx = setupTest();
   ctx.fileCall('KET-51', row.title);
@@ -885,7 +885,7 @@ test.each([
     ctx.answerInConsole('KET-51');
   }
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-51' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${row.why}; ask z-stu to record it` });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-51' })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${row.why}; ask stu to record it` });
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
 });
 
@@ -894,7 +894,7 @@ test('it refuses a call: source for lgtm when the owner answered the call with s
   ctx.fileCall('KET-52', 'lgtm widgets#7?');
   recordConsoleAnswer(ctx.db, { id: 'KET-52', option: '', note: 'No', actor: 'owner' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-52' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the owner\'s answer to call:KET-52 is not a plain yes: "No"; ask z-stu to record it' });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'answer', ['widgets', '7', 'lgtm'], { source: 'call:KET-52' })).rejects.toMatchObject({ code: 'bad_args', message: '--source refused: the owner\'s answer to call:KET-52 is not a plain yes: "No"; ask stu to record it' });
   expect(ctx.db.query('SELECT COUNT(*) AS total FROM pr_status').get()).toStrictEqual({ total: 0 });
 });
 
@@ -1033,7 +1033,7 @@ test.each(['console:KET-60', 'call:KET-60'])('it refuses a CI check override fro
   const ctx = setupTest();
   ctx.fileGrantCall('KET-60', { action: 'override', pr: 'zgeoff/widgets#7', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' });
 
-  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source, note: 'An intended infra change.', check: ['preview'] })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${source} cannot override a CI check: only the owner's own chat source may, so the owner names the check in the command; ask z-stu to record it` });
+  await expect(ctx.asOther(ctx.headAt('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'), 'override', ['widgets', '7'], { source, note: 'An intended infra change.', check: ['preview'] })).rejects.toMatchObject({ code: 'bad_args', message: `--source refused: ${source} cannot override a CI check: only the owner's own chat source may, so the owner names the check in the command; ask stu to record it` });
 
   expect(ctx.db.query("SELECT COUNT(*) AS total FROM events WHERE action = 'pr-override'").get()).toStrictEqual({ total: 0 });
 });

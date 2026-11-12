@@ -38,11 +38,11 @@ test('v18 adds a news tag and the usage samples', () => {
   const path = `${ctx.directory}/v17.db`;
   const v17 = new Database(path, { create: true });
   migrate(v17, path, false, MIGRATIONS.slice(0, 17));
-  v17.query(`INSERT INTO news (from_name, topic, text, added_at) VALUES ('z-stu', 'fix', 'Kept across the upgrade.', '2026-10-16T00:00:00Z')`).run();
+  v17.query(`INSERT INTO news (from_name, topic, text, added_at) VALUES ('stu', 'fix', 'Kept across the upgrade.', '2026-10-16T00:00:00Z')`).run();
   v17.close();
   const db = openDb(path);
   expect(db.query('SELECT text, tag FROM news').all()).toEqual([{ text: 'Kept across the upgrade.', tag: null }]);
-  db.query(`INSERT INTO news (from_name, topic, text, added_at, tag) VALUES ('z-stu', 'fix', 'Tagged.', '2026-10-16T00:00:00Z', 'weekly-flag')`).run();
+  db.query(`INSERT INTO news (from_name, topic, text, added_at, tag) VALUES ('stu', 'fix', 'Tagged.', '2026-10-16T00:00:00Z', 'weekly-flag')`).run();
   db.query(`INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES ('2026-10-16T00:00:00Z', 'active', 10, 20)`).run();
   db.query(`INSERT INTO usage_samples (at, account, five_hour, seven_day) VALUES ('2026-10-16T00:00:00Z', 'abc', NULL, NULL)`).run();
   expect(() => db.query(`INSERT INTO usage_samples (at, account) VALUES ('2026-10-16T00:00:00Z', 'active')`).run()).toThrow();

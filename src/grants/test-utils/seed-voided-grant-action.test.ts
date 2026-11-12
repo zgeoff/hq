@@ -17,7 +17,7 @@ test('#seedVoidedGrantAction logs an act and voids it as the owner, and input ov
 
   await seedVoidedGrantAction(ctx, { target: 'kettle#8' });
 
-  expect(ctx.readActions()).toStrictEqual([{ id: 1, target: 'kettle#8', voided_at: '2026-10-14T01:30:00Z', voided_by: 'z-stu', void_reason: 'logged before the merge failed' }]);
+  expect(ctx.readActions()).toStrictEqual([{ id: 1, target: 'kettle#8', voided_at: '2026-10-14T01:30:00Z', voided_by: 'stu', void_reason: 'logged before the merge failed' }]);
 });
 
 test('#seedVoidedGrantAction leaves the acts logged before it live', async () => {

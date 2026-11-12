@@ -96,7 +96,7 @@ export interface FakeAtcSession {
 }
 
 export function fakeAtc(directory: string, sessions: FakeAtcSession[] = [
-  { id: 'id-stu', name: 'z-stu', alive: true, state: 'done' },
+  { id: 'id-stu', name: 'stu', alive: true, state: 'done' },
   { id: 'id-refine', name: 'z-refine', alive: true, state: 'done' },
   { id: 'id-steward', name: 'z-steward', alive: true, state: 'done' },
   { id: 'id-delivery', name: 'z-delivery', alive: true, state: 'done' },

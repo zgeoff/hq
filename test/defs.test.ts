@@ -76,13 +76,13 @@ test.each(['', 'HQ', 'private', 'hq-private', 'nixie', 'nixie-definitions', 'hq 
 
 test('a switch needs a passing preflight; a failed one changes nothing', () => {
   expect(preflight('hq')[0]).toMatchObject({ ok: false, line: expect.stringContaining('not a checkout') });
-  expect(() => useSource(db, 'hq', 'z-stu')).toThrow('hq is not ready; nothing changed');
+  expect(() => useSource(db, 'hq', 'stu')).toThrow('hq is not ready; nothing changed');
 
   expect(existsSync(requireEnv('HQ_DEFS_SOURCE_FILE'))).toBe(false);
   createReadyBoth({ 'skills/preview-qa/references/session-prompt.md': '```text\na\n```\n```text\nb\n```\n' });
   const checks = preflight('hq');
   expect(checks.filter((c) => !c.ok).map((c) => c.line)).toEqual([expect.stringContaining('z-qa: origin/main:skills/preview-qa/references/session-prompt.md: 2 ```text blocks'), expect.stringContaining('grants: grants.ts --check --private failed')]);
-  expect(() => useSource(db, 'hq', 'z-stu')).toThrow('z-qa');
+  expect(() => useSource(db, 'hq', 'stu')).toThrow('z-qa');
   expect(existsSync(requireEnv('HQ_DEFS_SOURCE_FILE'))).toBe(false);
 });
 
@@ -98,12 +98,12 @@ test('it checks the lane files in delivery-lead once the rebuilt tree holds them
 test('a ready checkout writes the switch file, and the event records it', () => {
   createReadyBoth();
   expect(preflight('hq').every((c) => c.ok)).toBe(true);
-  const r = useSource(db, 'hq', 'z-stu');
-  expect(r).toMatchObject({ from: 'none', to: 'hq' });
+  const switched = useSource(db, 'hq', 'stu');
+  expect(switched).toMatchObject({ from: 'none', to: 'hq' });
   expect(readFileSync(requireEnv('HQ_DEFS_SOURCE_FILE'), 'utf8')).toBe('hq\n');
   expect(defsSource()).toBe('hq');
   expect(DEFS()).toBe(DEFS_SOURCES.hq.dir());
-  expect(db.query(`SELECT actor, from_state, to_state FROM events WHERE action = 'source'`).get()).toEqual({ actor: 'z-stu', from_state: 'none', to_state: 'hq' });
+  expect(db.query(`SELECT actor, from_state, to_state FROM events WHERE action = 'source'`).get()).toStrictEqual({ actor: 'stu', from_state: 'none', to_state: 'hq' });
 
   expect(process.env['HQ_DEFINITIONS_DIR']).toBeUndefined();
   expect(defsSource()).toBe('hq');
@@ -114,7 +114,7 @@ test('hq defs use repairs a switch file with a bad value', () => {
   mkdirSync(`${dir}/z-sessions`, { recursive: true });
   writeFileSync(requireEnv('HQ_DEFS_SOURCE_FILE'), 'hq-old\n');
   expect(() => defsSource()).toThrow('it must be');
-  expect(useSource(db, 'hq', 'z-stu')).toMatchObject({ from: 'hq-old', to: 'hq' });
+  expect(useSource(db, 'hq', 'stu')).toMatchObject({ from: 'hq-old', to: 'hq' });
   expect(defsSource()).toBe('hq');
 });
 
@@ -122,7 +122,7 @@ test('a checkout of another repo fails the preflight', () => {
   createReadyBoth();
   Bun.spawnSync(['git', '-C', DEFS_SOURCES.hq.dir(), 'remote', 'set-url', 'origin', 'git@github.com:zgeoff/nixie-definitions.git']);
   expect(preflight('hq')).toEqual([{ ok: false, line: expect.stringContaining('not zgeoff/hq') }]);
-  expect(() => useSource(db, 'hq', 'z-stu')).toThrow('nothing changed');
+  expect(() => useSource(db, 'hq', 'stu')).toThrow('nothing changed');
   // Two origin urls: fetch uses the first, so a matching last one is not enough.
   Bun.spawnSync(['git', '-C', DEFS_SOURCES.hq.dir(), 'remote', 'set-url', 'origin', 'https://example.com/other.git']);
   Bun.spawnSync(['git', '-C', DEFS_SOURCES.hq.dir(), 'config', '--add', 'remote.origin.url', 'git@github.com:zgeoff/hq.git']);
@@ -257,8 +257,11 @@ test.each([
 
 test('one setting moves the definitions checkout for the fleet, the lanes and the prompts (GEO-1019)', () => {
   const cap = process.env['HQ_CAPACITY'];
-  const DEFS_USERS = ['z-stu', 'z-delivery', 'z-triage', 'z-steward', 'z-qa', 'z-review']; // z-q works in hq's own repo
-  const users = () => ({ fleet: [...new Set(declaredFleet().filter((e) => DEFS_USERS.includes(e.name)).map((e) => e.cwd))], capacity: LANES.capacityScript(), prompts: DEFS() });
+
+  // z-q works in hq's own repo
+  const DEFS_USERS = new Set(['stu', 'z-delivery', 'z-triage', 'z-steward', 'z-qa', 'z-review']);
+  // oxlint-disable-next-line eslint/new-cap -- DEFS is a function, and every caller names it so
+  const users = () => ({ fleet: [...new Set(declaredFleet().filter((entry) => DEFS_USERS.has(entry.name)).map((entry) => entry.cwd))], capacity: LANES.capacityScript(), prompts: DEFS() });
   delete process.env['HQ_CAPACITY'];
   try {
     createReadyBoth();

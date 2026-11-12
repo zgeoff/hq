@@ -3,6 +3,7 @@ import { iso } from '../clock/iso.ts';
 import { HqError } from '../errors.ts';
 import { buildTrimPlan } from './build-trim-plan.ts';
 import { getStateLimit, getStateTrimTarget } from './get-state-limit.ts';
+import { getStateOwner } from './get-state-owner.ts';
 import type { StateFiles, TrimReport } from './types.ts';
 
 export interface StateTrimArgs {
@@ -22,7 +23,7 @@ export function runStateTrim(args: StateTrimArgs): TrimReport {
   if (!args.roles.includes(role)) {
     throw new HqError('unknown_role', `${role} is not a fleet role (${args.roles.join(', ')}), so it has no state file to trim`);
   }
-  const owner = `z-${role}`;
+  const owner = getStateOwner(role);
 
   // only the owning session writes its state file, and it is blocked while it runs this command, so no write can land between the read and the rename
   if (!args.dryRun && args.actor !== owner) {

@@ -1,4 +1,4 @@
-# after compaction: z-stu
+# after compaction: stu
 
 Before your next action, read these again, since compaction dropped them:
 

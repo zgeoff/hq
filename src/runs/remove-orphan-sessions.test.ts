@@ -162,7 +162,7 @@ test('it keeps an exited session no run recorded and a fleet session', async () 
   const ctx = await setupTest();
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
   ctx.seed.atcSession({ id: '0000f001-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'owners-own', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
-  ctx.seed.atcSession({ id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
+  ctx.seed.atcSession({ id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'stu', alive: false, state: 'exited' }, '2026-11-07T01:00:00Z');
 
   await ctx.sweep();
 
@@ -172,7 +172,7 @@ test('it keeps an exited session no run recorded and a fleet session', async () 
 test('it forgets an exited child of a fleet session that no run recorded', async () => {
   const ctx = await setupTest();
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
-  ctx.seed.atcSession({ id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: true, state: 'done' }, '2026-11-07T02:59:00Z');
+  ctx.seed.atcSession({ id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'stu', alive: true, state: 'done' }, '2026-11-07T02:59:00Z');
   ctx.seed.atcSession({ id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'helper', alive: false, state: 'exited', parent: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T01:00:00Z');
 
   await ctx.sweep();
@@ -221,7 +221,7 @@ test('it keeps a pinned exited session of a closed run without a call to atc or 
 test('it keeps an exited child of a pinned fleet session without a call to atc or a kept event', async () => {
   const ctx = await setupTest();
   updateEnv('HQ_NOW', '2026-11-07T03:00:00Z');
-  ctx.seed.atcSession({ id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'z-stu', alive: true, state: 'done', pinned: true }, '2026-11-07T02:59:00Z');
+  ctx.seed.atcSession({ id: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'stu', alive: true, state: 'done', pinned: true }, '2026-11-07T02:59:00Z');
   ctx.seed.atcSession({ id: '0000f003-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'helper', alive: false, state: 'exited', parent: '0000f002-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, '2026-11-07T01:00:00Z');
 
   await ctx.sweep();

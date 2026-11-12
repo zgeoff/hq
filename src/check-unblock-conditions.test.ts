@@ -75,7 +75,7 @@ test('it keeps open an item that was closed and reopened while GitHub was read, 
   createUnblockItems(ctx.db, { review: { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
   const github = makePRStateGh({ states: { 'kettle-co/kettle#4': 'MERGED' } });
   const run: Runner = (cmd, opts) => {
-    closeUnblock(ctx.db, 'review', 'done', null, 'z-stu');
+    closeUnblock(ctx.db, 'review', 'done', null, 'stu');
     createUnblockItems(ctx.db, { review: { task: 'Review kettle#4 and say lgtm', links: [{ label: 'kettle#4', url: 'https://github.com/kettle-co/kettle/pull/4', subject: true }] } });
     return github(cmd, opts);
   };

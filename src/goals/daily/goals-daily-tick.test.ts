@@ -51,7 +51,7 @@ test('nothing before 18:00', () => {
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
 });
 
-test('at 18:00 one message goes to z-stu: 7 goal lines, 3 throughput lines and the incidents; a second tick sends nothing', () => {
+test('it sends stu one message at 18:00: 7 goal lines, 3 throughput lines and the incidents; a second tick sends nothing', () => {
   const ctx = setupTest();
   ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '17:50'));
@@ -59,7 +59,7 @@ test('at 18:00 one message goes to z-stu: 7 goal lines, 3 throughput lines and t
   expect(result.run).toMatchObject({ job: 'goals-daily', key: '2026-10-16', result: 'queued', detail: null });
   const [message] = readOutboxRows(ctx.db);
   expect(readOutboxRows(ctx.db)).toHaveLength(1);
-  expect(message).toMatchObject({ target: 'z-stu', status: 'pending', topic: 'job:goals-daily:2026-10-16' });
+  expect(message).toMatchObject({ target: 'stu', status: 'pending', topic: 'job:goals-daily:2026-10-16' });
   const lines = message?.text.split('\n') ?? [];
   expect(lines[0]).toBe('Goals check-in, Fri 16 Oct:');
   expect(lines).toHaveLength(13);
@@ -82,7 +82,7 @@ test('a line carries the colour as words after the emoji', () => {
   const text = dailyText(ctx.db, syd('2026-10-16', '18:00'));
   expect(text).toContain('- Bug share: today 0% (1 typed PRs), week so far 0% (1 typed PRs); target <20% by 2 Nov 🟢 green');
   expect(text).toContain('- Feature + Improvement share: today 100% (1 typed PRs), week so far 100% (1 typed PRs); target >=60% 🟢 green');
-  setTarget(ctx.db, 'bugs', '>', '50', 'z-stu');
+  setTarget(ctx.db, 'bugs', '>', '50', 'stu');
   expect(dailyText(ctx.db, syd('2026-10-16', '18:00'))).toContain('target >50% by 2 Nov 🔴 red');
 });
 
@@ -204,9 +204,9 @@ test('hq goals daily sends now, once; a dry run sends nothing and writes no job 
   dailyText(ctx.db, sentAt);
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
   expect(ctx.db.query('SELECT COUNT(*) AS count FROM job_runs').get()).toStrictEqual({ count: 0 });
-  expect(sendDaily(ctx.db, 'z-stu', sentAt)).toMatchObject({ result: 'queued', detail: 'manual' });
+  expect(sendDaily(ctx.db, 'stu', sentAt)).toMatchObject({ result: 'queued', detail: 'manual' });
   expect(readOutboxRows(ctx.db)).toHaveLength(1);
-  expect(() => sendDaily(ctx.db, 'z-stu', sentAt)).toThrow('already ran');
+  expect(() => sendDaily(ctx.db, 'stu', sentAt)).toThrow('already ran');
   expect(ctx.tick('2026-10-16', '18:00')).toStrictEqual({ run: null, waiting: null });
 });
 
@@ -214,7 +214,7 @@ test('a manual send refuses stale data', () => {
   const ctx = setupTest();
   ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '08:00'));
-  expect(() => sendDaily(ctx.db, 'z-stu', syd('2026-10-16', '10:10'))).toThrow('run hq goals sync first');
+  expect(() => sendDaily(ctx.db, 'stu', syd('2026-10-16', '10:10'))).toThrow('run hq goals sync first');
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
 });
 
@@ -222,12 +222,12 @@ test('skip leaves a day alone; bad skips are refused', () => {
   const ctx = setupTest();
   ctx.seed.fetchedDays();
   ctx.synced(syd('2026-10-16', '17:50'));
-  skipDaily(ctx.db, '2026-10-16', 'done by hand', 'z-stu');
+  skipDaily(ctx.db, '2026-10-16', 'done by hand', 'stu');
   expect(ctx.tick('2026-10-16', '18:00')).toStrictEqual({ run: null, waiting: null });
   expect(readOutboxRows(ctx.db)).toStrictEqual([]);
-  expect(() => skipDaily(ctx.db, '2026-10-16', 'again', 'z-stu')).toThrow('already ran');
-  expect(() => skipDaily(ctx.db, '2026-02-30', 'x', 'z-stu')).toThrow('Sydney date');
-  expect(() => skipDaily(ctx.db, '2026-10-17', ' ', 'z-stu')).toThrow('--reason');
+  expect(() => skipDaily(ctx.db, '2026-10-16', 'again', 'stu')).toThrow('already ran');
+  expect(() => skipDaily(ctx.db, '2026-02-30', 'x', 'stu')).toThrow('Sydney date');
+  expect(() => skipDaily(ctx.db, '2026-10-17', ' ', 'stu')).toThrow('--reason');
 });
 
 test('health is red at 18:31 with no run, quiet before 18:30, green once it ran', () => {

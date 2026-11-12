@@ -24,9 +24,9 @@ never as a real player.
    `qa-geo-1926`: the account exists. When the seed refuses because the account exists and `qa.md`
    lists no other check for it, an earlier check left it. Delete it with
    `bun run qa:reset --user qa-geo-<n> --all --yes`, and seed again.
-5. **Drive a phone item yourself,** through the phone's Chrome, on the DevTools port `z-stu` gives
-   you. Send `z-stu` only the hands-on steps, such as signing in or switching airplane mode, one at
-   a time, and wait for each. `z-stu` passes each to the owner.
+5. **Drive a phone item yourself,** through the phone's Chrome, on the DevTools port `stu` gives
+   you. Send `stu` only the hands-on steps, such as signing in or switching airplane mode, one at
+   a time, and wait for each. `stu` passes each to the owner.
 6. **Go offline only while `qa:cdp offline` runs:** the phone is back online when it ends. An item
    that needs the phone offline for longer needs the owner, unless the runbook can keep it offline.
 7. **Reset the account when you finish,** pass or fail, and remove its line from

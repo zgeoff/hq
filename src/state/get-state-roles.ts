@@ -1,5 +1,6 @@
 import { getDeclaredSessions } from '../roles/get-declared-sessions.ts';
+import { toStateRole } from './to-state-role.ts';
 
 export function getStateRoles(): string[] {
-  return getDeclaredSessions().flatMap((session) => (session.name.startsWith('z-') ? [session.name.slice(2)] : []));
+  return getDeclaredSessions().map((session) => toStateRole(session.name));
 }

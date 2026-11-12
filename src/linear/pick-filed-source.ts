@@ -1,3 +1,4 @@
+import { getDeclaredForwards } from '../roles/get-declared-forwards.ts';
 import { isZSession } from './is-z-session.ts';
 import { Z_SESSIONS } from './z-sessions.ts';
 import type { FiledSource, ZSession } from './types.ts';
@@ -40,7 +41,8 @@ function findMarkedSource(description: string): ZSession | 'agent' | null {
     }
     const name = FILED_BY_MARK.exec(text)?.groups?.['name'];
     if (name !== undefined) {
-      return isZSession(name, Z_SESSIONS) ? name : 'agent';
+      const current = getDeclaredForwards()[name] ?? name;
+      return isZSession(current, Z_SESSIONS) ? current : 'agent';
     }
   }
   return null;

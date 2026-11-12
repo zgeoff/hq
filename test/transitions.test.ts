@@ -109,26 +109,26 @@ test('#answerAsk refuses a queued ask', () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
   ctx.addTeaAsk();
-  expect(() => answerAsk(ctx.db, { id: 'tea-or-coffee', kind: undefined, answer: 'tea', actor: 'z-stu' })).toThrow('tea-or-coffee is queued: answered needs open');
+  expect(() => answerAsk(ctx.db, { id: 'tea-or-coffee', kind: undefined, answer: 'tea', actor: 'stu' })).toThrow('tea-or-coffee is queued: answered needs open');
 });
 
 test('#applyAsk refuses an open ask', () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
   ctx.addTeaAsk();
-  openAsk(ctx.db, { force: false, actor: 'z-stu' });
-  expect(() => applyAsk(ctx.db, 'tea-or-coffee', undefined, 'none', null, 'z-stu')).toThrow('open: applied needs answered');
+  openAsk(ctx.db, { force: false, actor: 'stu' });
+  expect(() => applyAsk(ctx.db, 'tea-or-coffee', undefined, 'none', null, 'stu')).toThrow('open: applied needs answered');
 });
 
 test('it refuses later, skip, close and open on a closed ask, which the table leaves out', () => {
   const ctx = setupTest();
   at(NOON_SYDNEY);
   ctx.addTeaAsk();
-  closeAsk(ctx.db, 'tea-or-coffee', undefined, 'moot', 'z-stu');
-  expect(() => laterAsk(ctx.db, 'tea-or-coffee', undefined, null, 'z-stu')).toThrow('later needs open or queued');
-  expect(() => skipAsk(ctx.db, 'tea-or-coffee', undefined, null, 'z-stu')).toThrow('skipped needs');
-  expect(() => closeAsk(ctx.db, 'tea-or-coffee', undefined, 'again', 'z-stu')).toThrow('closed needs');
-  expect(() => openAsk(ctx.db, { id: 'tea-or-coffee', force: true, actor: 'z-stu' })).toThrow('only queued or due items open');
+  closeAsk(ctx.db, 'tea-or-coffee', undefined, 'moot', 'stu');
+  expect(() => laterAsk(ctx.db, 'tea-or-coffee', undefined, null, 'stu')).toThrow('later needs open or queued');
+  expect(() => skipAsk(ctx.db, 'tea-or-coffee', undefined, null, 'stu')).toThrow('skipped needs');
+  expect(() => closeAsk(ctx.db, 'tea-or-coffee', undefined, 'again', 'stu')).toThrow('closed needs');
+  expect(() => openAsk(ctx.db, { id: 'tea-or-coffee', force: true, actor: 'stu' })).toThrow('only queued or due items open');
 });
 
 test('#setState refuses to change a done run without --reopen', () => {

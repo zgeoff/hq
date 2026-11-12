@@ -389,7 +389,7 @@ function renderSession(file: string, body: string, context: RenderContext): stri
     return undefined;
   }
   const blocks = [...body.matchAll(TEXT_BLOCK)];
-  const session = /The start prompt for `(?<name>z-[a-z0-9-]+)`/u.exec(body)?.groups?.['name'];
+  const session = /The start prompt for `(?<name>(?:z-)?[a-z][a-z0-9-]*)`/u.exec(body)?.groups?.['name'];
   const withGrants = blocks.filter((block) => NEW_FORM.test(block.groups?.['content'] ?? '') || RETIRED_FORM.test(block.groups?.['content'] ?? ''));
   if (withGrants.length === 0) {
     return undefined;

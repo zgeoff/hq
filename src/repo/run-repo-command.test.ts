@@ -33,7 +33,7 @@ function setupTest() {
     ...base,
     command: (verb: string | undefined, rest: string[], dryRun = false) =>
       runRepoCommand({
-        actor: 'z-stu',
+        actor: 'stu',
         createBackup: createStoreBackup,
         db: base.db,
         dryRun,

@@ -67,7 +67,7 @@ test('a Claude usage alert reads as the early warning and names the launch limit
 test('a Claude usage alert prints the configured early warning, not the default', () => {
   const ctx = setupTest();
   const empty = { at: '2026-10-15T01:00:00Z', impd_budget_mib: null, impd_used_mib: null, impd_committed_mib: null, nonnix_awake_mib: null, nonnix_awake_vcpus: null, nix_awake_mib: null, impd_priority_kept_mib: null, cloud_avail_bytes: null, cloud_total_bytes: null, claude_account: null, claude_five_hour: 10, claude_seven_day: 91, claude_five_hour_resets_at: null, claude_seven_day_resets_at: null, claude_at: '2026-10-15T01:00:00Z', ci_minutes_today: null, pc_disk_free_bytes: null, pc_mem_avail_bytes: null, op_account_used: null, op_account_limit: null, op_refused: null, errors: {} };
-  setCapacitySetting(ctx.db, 'claudeSevenDayPct', '90', 'z-stu');
+  setCapacitySetting(ctx.db, 'claudeSevenDayPct', '90', 'stu');
   for (const minute of [0, 5]) {
     checkCapacity(ctx.db, { reading: empty, plan: null, claudeLaunchPct: 95 }, 'hq-lanes', new Date(Date.parse('2026-10-15T01:00:00Z') + minute * 60_000));
   }

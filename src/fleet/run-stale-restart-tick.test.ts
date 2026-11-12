@@ -37,7 +37,7 @@ function setupTest(config: { sessions?: RosterSession[]; cwd?: string } = {}) {
   const kettle: FleetEntry = { name: 'z-kettle', cwd: config.cwd ?? `${base.dir}/work`, model: 'opus', prompt: `main:${kettlePromptPath}`, wake: false };
   const roster = (config.sessions ?? [{ id: 'id-kettle', name: 'z-kettle', state: 'done' }]).map((session) => Object.assign(session, { alive: true, pinned: true }));
   const server = fakeAtc(base.dir, roster);
-  const steward: FleetEntry = { name: 'z-stu', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${kettlePromptPath}`, wake: false, roles: ['owner'] };
+  const steward: FleetEntry = { name: 'stu', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${kettlePromptPath}`, wake: false, roles: ['owner'] };
   const urn: FleetEntry = { name: 'z-urn', cwd: `${base.dir}/work`, model: 'opus', prompt: `main:${urnPromptPath}`, wake: false };
   createDefsRepo(base.dir, { [kettlePromptPath]: `\`\`\`text\n${newPrompt}\n\`\`\`\n`, [urnPromptPath]: '```text\nYou are Urn. Keep the water hot.\n```\n' });
   onTestFinished(base.cleanup);
@@ -235,7 +235,7 @@ test('it tells the owner once after six skips and still does not restart', async
     await ctx.tick(minutes, [ctx.kettle]);
   }
 
-  expect(ctx.outboxTo('z-stu')).toStrictEqual([{ target: 'z-stu', text: expect.stringMatching(/z-kettle.*deferred its restart 6 times/u) }]);
+  expect(ctx.outboxTo('stu')).toStrictEqual([{ target: 'stu', text: expect.stringMatching(/z-kettle.*deferred its restart 6 times/u) }]);
   expect(ctx.refresh()['z-kettle']?.reported).toBe(true);
   expect(ctx.atc.calls).toStrictEqual([]);
 });
@@ -281,7 +281,7 @@ test('it holds a restart that a session said saved for before 03:00 Sydney until
 });
 
 test('it never asks a session with the owner role', async () => {
-  const ctx = setupTest({ sessions: [{ id: 'id-stu', name: 'z-stu', state: 'done' }] });
+  const ctx = setupTest({ sessions: [{ id: 'id-stu', name: 'stu', state: 'done' }] });
 
   await ctx.tick(0, [ctx.steward]);
   await ctx.tick(121, [ctx.steward]);
@@ -470,7 +470,7 @@ test('it tells the owner when the spawn fails after the forget', async () => {
   ctx.atc.messages.set('m-1', { status: 'answered', answer: 'saved' });
   await ctx.tick(126, [ctx.kettle]);
 
-  expect(ctx.outboxTo('z-stu')).toContainEqual({ target: 'z-stu', text: expect.stringContaining('not spawned again') });
+  expect(ctx.outboxTo('stu')).toContainEqual({ target: 'stu', text: expect.stringContaining('not spawned again') });
   expect(ctx.refresh()).toStrictEqual({});
 });
 
