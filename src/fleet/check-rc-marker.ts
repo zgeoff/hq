@@ -94,7 +94,7 @@ export async function checkRcMarker(db: Database, check: RcCheck): Promise<RcEva
     return endMine('remote control', `typed /remote-control ${name}; Remote Control is on.`, { result: 'on', rc: last });
   }
 
-  // z-stu: told at once, since the typing may have turned off a Remote Control the owner had turned on.
+  // The owner's session: told at once, since the typing may have turned off a Remote Control the owner had turned on.
   return endMine('failed', `typed /remote-control ${name}, but no Remote Control record showed within 30 s (${last.why}).`, { result: 'not on', rc: last }, `Remote Control may be off in ${name}: typed, no record (${pending.id.slice(0, 8)}). Ask the owner to check.`);
 }
 

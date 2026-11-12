@@ -1,4 +1,4 @@
-// The PC is shown, never alerted on: `hq health` already alerts z-stu on its disk and memory.
+// The PC is shown, never alerted on: `hq health` already alerts the owner's session on its disk and memory.
 import type { Database } from 'bun:sqlite';
 import { now } from '../clock/now.ts';
 import { checkCapacity as evaluateCapacity } from './check-capacity.ts';

@@ -4,7 +4,7 @@ import { dbPath } from '../db/db-path.ts';
 import { toErrorMessage } from '../to-error-message.ts';
 
 // Only hq on the live database writes to the live atc: a test, or a run on a scratch database (a
-// review, a check from source), once sent invented alerts to z-stu.
+// review, a check from source), once sent invented alerts to the owner's session.
 export function writeRefusal(): string | null {
   if (config().HQ_ATC_SOCKET) return null;
   if (process.env.NODE_ENV === 'test') return 'a test never writes to the live atc; name a fake one with HQ_ATC_SOCKET';

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { judgeCallAnswer } from './judge-call-answer.ts';
+import fleet from '../../fleet.json';
 
 function setupTest() {
   return { request: { ref: { repo: 'widgets', pr: 7, slug: 'zgeoff/widgets' }, answer: 'lgtm', source: 'call:KET-50', head: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678' } as const };
@@ -21,4 +22,11 @@ test.each([
   const ctx = setupTest();
 
   expect(judgeCallAnswer(ctx.request, evidence)).toBe(why);
+});
+
+test('it names the owner session that fleet.json marks with the owner role', () => {
+  const ctx = setupTest();
+  const declaredOwner = fleet.sessions.find((session) => session.roles?.includes('owner'));
+
+  expect(judgeCallAnswer(ctx.request, { title: 'lgtm widgets#7?', answer: null })).toContain(`(${declaredOwner?.name})`);
 });
